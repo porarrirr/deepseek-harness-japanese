@@ -138,6 +138,13 @@ describe('apply', () => {
           'row.instructions': 'Instructions',
           'menu.userOnly': 'user-only',
         },
+        ja: {
+          'row.running': 'スキルを読み込み中',
+          'row.failed': 'スキルの読み込みに失敗',
+          'row.stopped': 'スキルの読み込みを停止',
+          'row.instructions': '説明',
+          'menu.userOnly': 'ユーザーのみ',
+        },
       },
     }])
   })

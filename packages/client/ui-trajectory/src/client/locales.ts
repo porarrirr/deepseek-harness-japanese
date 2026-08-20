@@ -62,3 +62,21 @@ export const en: Record<TrajectoryKey, string> = {
   'toolbar.search': 'Search trajectory',
   'toolbar.searchPlaceholder': 'Search',
 }
+
+/** Japanese dictionary; trajectory-specific operation terms remain untranslated. */
+export const ja: Record<TrajectoryKey, string> = {
+  'view.trajectory': '軌跡',
+  'toolbar.aria': '軌跡ツールバー',
+  'toolbar.duration': 'Duration',
+  'toolbar.useActualDuration': 'Use actual duration',
+  'toolbar.useEqualWidth': 'Use equal-width operations',
+  'toolbar.actualTime': '実時間',
+  'toolbar.turns': 'Turns',
+  'toolbar.expandTurns': 'Expand turns',
+  'toolbar.collapseTurns': 'Collapse turns',
+  'toolbar.calls': 'Calls',
+  'toolbar.expandCalls': 'Expand calls',
+  'toolbar.collapseCalls': 'Collapse calls',
+  'toolbar.search': '軌跡を検索',
+  'toolbar.searchPlaceholder': '検索',
+}

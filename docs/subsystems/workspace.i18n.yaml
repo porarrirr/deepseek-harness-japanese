@@ -2,5 +2,6 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/workspace.md
-workspace.md: b15b07982b08ebaf63c49584ef27923ec97bb283
-workspace.zh.md: 253648d96787c4b384065f599750e3082d0eaf33
+workspace.md: 0893d8f497a66ec5ec9bea70c6c03a3eb5b76508
+workspace.zh.md: af7a4b6ae3a38acb6ae4c4d062dd6b56b488f594
+workspace.ja.md: 37d25b2af45a80c5511107e915ea113973777383

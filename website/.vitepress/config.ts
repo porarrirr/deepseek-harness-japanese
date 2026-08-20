@@ -45,7 +45,7 @@ interface GuideModuleLink {
  */
 interface GuideModules {
   /** Guide sidebar collection for the locale. */
-  guide: 'zh-guide' | 'en-guide'
+  guide: 'zh-guide' | 'en-guide' | 'ja-guide'
   /** Development module link. */
   develop: GuideModuleLink
   /** Reference module link. */
@@ -66,6 +66,11 @@ const guideModules = {
     guide: 'en-guide',
     develop: { label: 'Development', collection: 'en-develop' },
     reference: { label: 'Reference', collection: 'en-reference' },
+  },
+  ja: {
+    guide: 'ja-guide',
+    develop: { label: '開発', collection: 'ja-develop' },
+    reference: { label: 'リファレンス', collection: 'ja-reference' },
   },
 } satisfies Record<DocsLocale, GuideModules>
 
@@ -95,7 +100,7 @@ function guideSidebar(locale: DocsLocale): DefaultTheme.SidebarItem[] {
  */
 function moduleNav(locale: DocsLocale): DefaultTheme.NavItem[] {
   const { develop, reference } = guideModules[locale]
-  const routePrefix = locale === 'root' ? '' : '/en'
+  const routePrefix = locale === 'root' ? '' : `/${locale}`
   return [
     { text: develop.label, link: landingLink(locale, develop.collection), activeMatch: `^${routePrefix}/develop/` },
     { text: reference.label, link: landingLink(locale, reference.collection), activeMatch: `^${routePrefix}/reference/` },
@@ -139,6 +144,29 @@ const sharedTheme: Pick<DefaultTheme.Config, 'search' | 'socialLinks' | 'editLin
                 navigateDownKeyAriaLabel: '下方向键',
                 closeText: '关闭',
                 closeKeyAriaLabel: 'Esc 键',
+              },
+            },
+          },
+        },
+        ja: {
+          translations: {
+            button: {
+              buttonText: 'ドキュメントを検索',
+              buttonAriaLabel: 'ドキュメントを検索',
+            },
+            modal: {
+              displayDetails: '詳細を表示',
+              resetButtonTitle: '検索をクリア',
+              backButtonTitle: '検索を閉じる',
+              noResultsText: '結果が見つかりません',
+              footer: {
+                selectText: '選択',
+                selectKeyAriaLabel: 'Enterキー',
+                navigateText: '移動',
+                navigateUpKeyAriaLabel: '上矢印キー',
+                navigateDownKeyAriaLabel: '下矢印キー',
+                closeText: '閉じる',
+                closeKeyAriaLabel: 'Escキー',
               },
             },
           },
@@ -312,6 +340,41 @@ export default withMermaid({
         },
         outline: { label: 'On this page' },
         docFooter: { prev: 'Previous', next: 'Next' },
+      },
+    },
+    ja: {
+      label: '日本語',
+      lang: 'ja-JP',
+      link: '/ja/',
+      themeConfig: {
+        siteTitle: siteTitle('プレビュー'),
+        nav: [
+          { text: 'ガイド', link: landingLink('ja', guideModules.ja.guide), activeMatch: '^/ja/guide/' },
+          ...moduleNav('ja'),
+        ],
+        sidebar: {
+          '/ja/guide/': guideSidebar('ja'),
+          '/ja/develop/': sidebar('ja', 'ja-develop'),
+          '/ja/reference/': sidebar('ja', 'ja-reference'),
+        },
+        editLink: {
+          pattern: ({ frontmatter }: PageData) => {
+            const data: unknown = frontmatter
+            const editSource: unknown = typeof data === 'object' && data !== null ? Reflect.get(data, 'editSource') : undefined
+            if (typeof editSource !== 'string') throw new Error('Projected documentation page has no editSource frontmatter.')
+            return `https://github.com/deepseek-ai/deepseek-harness/edit/master/${editSource}`
+          },
+          text: 'GitHubでこのページを編集',
+        },
+        outline: { label: 'このページの目次' },
+        docFooter: { prev: '前へ', next: '次へ' },
+        darkModeSwitchLabel: '外観',
+        lightModeSwitchTitle: 'ライトテーマに切り替え',
+        darkModeSwitchTitle: 'ダークテーマに切り替え',
+        sidebarMenuLabel: 'メニュー',
+        returnToTopLabel: 'トップに戻る',
+        langMenuLabel: '言語を切り替え',
+        skipToContentLabel: '本文へ移動',
       },
     },
   },

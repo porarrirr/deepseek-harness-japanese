@@ -24,3 +24,12 @@ export const en = {
   'loading': 'Loading…',
   'suggestions.aria': 'Trigger suggestions',
 } satisfies Record<MenuKey, string>
+
+/** Japanese dictionary, checked complete against the zh key set. */
+export const ja = {
+  'command': 'コマンド',
+  'skill': 'スキル',
+  'subagent': 'サブエージェント',
+  'loading': '読み込み中…',
+  'suggestions.aria': '候補を表示',
+} satisfies Record<MenuKey, string>

@@ -1,6 +1,6 @@
 # Terminology
 
-本表约定本仓库的中英术语统一译法。
+本表约定本仓库的中英术语统一译法；公开文档的日语术语补充在「日语类」章节。
 
 **通用规则：**
 - "中文"列为中文译文的正文默认用词。若该列为英文，则中文译文的正文中保留英文不翻译。
@@ -27,6 +27,16 @@
 | RAG | RAG | RAG（检索增强生成） | | |
 | SDK | SDK | | | 只指受支持的 Python 与 TypeScript SDK 所使用的 JSON-RPC 客户端／服务器协议；DeepSeek Harness 项目本身不是 SDK |
 | SSE | SSE | SSE（Server-Sent Events） | | |
+
+## 日语类（公开页面使用日语）
+
+| English | 日本語 | 备注 |
+|---|---|---|
+| Japanese | 日本語 | 语言名称与语言切换行中的固定文本 |
+| language switcher | 言語切替行 | 配对文件顶部的互链行 |
+| trilingual | 3言語 | 公开页面的英文、中文、日语配对 |
+| public page | 公開ページ | 从 `website/docs.ts` 的 `docsPages` 推导的页面集合 |
+| counterpart | 対訳ファイル | 双语或三语配对中的另一语言文件 |
 
 ## 英文类（中英文文本中均使用英文）
 

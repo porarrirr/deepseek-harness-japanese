@@ -13,6 +13,8 @@ import {
 } from './translation-pairing-record.ts'
 import {
   blobHash,
+  isPublicTranslationSource,
+  languageSwitcherLine,
   isTranslationScopeFile,
   languageSwitcherTargets,
   linksTo,
@@ -21,6 +23,7 @@ import {
   parseTranslationPairingCliArgs,
   parseTranslationPairingManifest,
   partitionGeneratedRegions,
+  publicTranslationSources,
   requiresSourceLanguageSwitcher,
   translationStructureDiff,
   translationStructureSignature,
@@ -167,6 +170,32 @@ describe('translation pairing switchers', () => {
     expect(translationStructureSignature(canonical, targets).links).toEqual([])
     expect(linksTo(wrongPath, targets)).toBe(false)
   })
+
+  it('renders the exact switcher line for every public language', () => {
+    expect(languageSwitcherLine('en', 'docs/guide.md', 'trilingual')).toBe(
+      'English | [中文](guide.zh.md) | [日本語](guide.ja.md)',
+    )
+    expect(languageSwitcherLine('zh', 'docs/guide.md', 'trilingual')).toBe(
+      '[English](guide.md) | 中文 | [日本語](guide.ja.md)',
+    )
+    expect(languageSwitcherLine('ja', 'docs/guide.md', 'trilingual')).toBe(
+      '[English](guide.md) | [中文](guide.zh.md) | 日本語',
+    )
+    expect(languageSwitcherLine('en', 'docs/guide.md', 'bilingual')).toBe(
+      'English | [中文](guide.zh.md)',
+    )
+    expect(() => languageSwitcherLine('ja', 'docs/guide.md', 'bilingual')).toThrow(
+      'require a trilingual pairing record',
+    )
+  })
+
+  it('derives public sources from the website publication manifest', () => {
+    expect(isPublicTranslationSource('docs/user/guide/providers.md')).toBe(true)
+    expect(isPublicTranslationSource('docs/user/guide/providers.zh.md')).toBe(true)
+    expect(isPublicTranslationSource('docs/user/guide/providers.ja.md')).toBe(true)
+    expect(isPublicTranslationSource('docs/development.md')).toBe(false)
+    expect(publicTranslationSources()).toContain('docs/user/guide/providers.md')
+  })
 })
 
 describe('translation pairing records', () => {
@@ -192,6 +221,48 @@ describe('translation pairing records', () => {
       `bar.zh.md: ${'2'.repeat(40)}`,
       '',
     ].join('\n'), paths)).toBeUndefined()
+  })
+
+  it('round-trips exactly three hashes for a published pair', () => {
+    const publicPaths = translationPairPaths('docs/user/guide/providers.md')
+    const publicRecord = {
+      sourceHash: '1'.repeat(40),
+      zhHash: '2'.repeat(40),
+      jaHash: '3'.repeat(40),
+    }
+    const rendered = renderTranslationPairingRecord(publicPaths, publicRecord, 'trilingual')
+    expect(parseTranslationPairingRecord(rendered, publicPaths, 'trilingual')).toEqual(publicRecord)
+    expect(parseTranslationPairingRecord(rendered, publicPaths)).toBeUndefined()
+    expect(rendered).toContain('providers.ja.md: ')
+  })
+
+  it('rejects a public record that has two or four hashes', () => {
+    const publicPaths = translationPairPaths('docs/user/guide/providers.md')
+    const twoHash = renderTranslationPairingRecord(publicPaths, record)
+    expect(parseTranslationPairingRecord(twoHash, publicPaths, 'trilingual')).toBeUndefined()
+    const fourHash = `${renderTranslationPairingRecord(publicPaths, {
+      ...record,
+      jaHash: '3'.repeat(40),
+    }, 'trilingual')}other.md: ${'4'.repeat(40)}\n`
+    expect(parseTranslationPairingRecord(fourHash, publicPaths, 'trilingual')).toBeUndefined()
+  })
+
+  it('detects owner content drift against a complete public record', () => {
+    const publicPaths = translationPairPaths('docs/user/guide/providers.md')
+    const source = Buffer.from('# Providers\n')
+    const zh = Buffer.from('# 提供商\n')
+    const ja = Buffer.from('# プロバイダー\n')
+    const publicRecord = {
+      sourceHash: blobHash(source),
+      zhHash: blobHash(zh),
+      jaHash: blobHash(ja),
+    }
+    expect(parseTranslationPairingRecord(
+      renderTranslationPairingRecord(publicPaths, publicRecord, 'trilingual'),
+      publicPaths,
+      'trilingual',
+    )).toEqual(publicRecord)
+    expect(blobHash(Buffer.from('# プロバイダー\n\n更新。\n'))).not.toBe(publicRecord.jaHash)
   })
 })
 
@@ -269,13 +340,14 @@ describe('pair CLI arguments', () => {
   it('normalizes any pair file or bare stem to the English anchor', () => {
     expect(pairAnchorOfArgument('docs/foo.md')).toBe('docs/foo.md')
     expect(pairAnchorOfArgument('docs/foo.zh.md')).toBe('docs/foo.md')
+    expect(pairAnchorOfArgument('docs/foo.ja.md')).toBe('docs/foo.md')
     expect(pairAnchorOfArgument('docs/foo.i18n.yaml')).toBe('docs/foo.md')
     expect(pairAnchorOfArgument('docs/foo')).toBe('docs/foo.md')
     expect(pairAnchorOfArgument('.\\docs\\foo.zh.md')).toBe('docs/foo.md')
   })
 
   it('scopes a check to named pairs and dedupes the three spellings', () => {
-    expect(parseTranslationPairingCliArgs(['docs/foo.zh.md', 'docs/foo.i18n.yaml', 'docs/bar.md'])).toEqual({
+    expect(parseTranslationPairingCliArgs(['docs/foo.zh.md', 'docs/foo.ja.md', 'docs/foo.i18n.yaml', 'docs/bar.md'])).toEqual({
       input: 'worktree',
       mode: 'check',
       scope: 'pairs',

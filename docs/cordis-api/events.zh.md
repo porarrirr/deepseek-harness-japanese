@@ -3,7 +3,7 @@
 
 # 事件
 
-[English](events.md) | 中文
+[English](events.md) | 中文 | [日本語](events.ja.md)
 
 每个上下文中都混入了事件分发 API。Harness 事件声明及其分发模式会生成到各自所属的[子系统页面](../subsystems/core.md)。
 

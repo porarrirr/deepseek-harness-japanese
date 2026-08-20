@@ -338,7 +338,7 @@ describe('settings domain', () => {
       preference: z.union(['light', 'dark', 'system']).default('system'),
     }))
     ctx.settings.register(settingsNamespace('locale'), z.object({
-      preference: z.union(['zh', 'en']).required(false),
+      preference: z.union(['zh', 'en', 'ja']).required(false),
     }))
     ctx.settings.register(settingsNamespace('ui-conversation'), z.object({
       busyEnter: z.union(['queue', 'steer']).default('queue'),
@@ -371,9 +371,9 @@ describe('settings domain', () => {
     expect(theme.value).toEqual({ preference: 'dark' })
     const locale = expectOk(await api.settings.mutate(request({
       ns: 'locale',
-      ops: [{ op: 'set', path: ['preference'], value: 'en' }],
+      ops: [{ op: 'set', path: ['preference'], value: 'ja' }],
     })))
-    expect(locale.value).toEqual({ preference: 'en' })
+    expect(locale.value).toEqual({ preference: 'ja' })
     const conversation = expectOk(await api.settings.mutate(request({
       ns: 'ui-conversation',
       ops: [{ op: 'set', path: ['busyEnter'], value: 'steer' }],

@@ -40,3 +40,22 @@ export const en = {
   'plan.decline': 'Refuse',
   'plan.discuss': 'Chat about it',
 } satisfies Record<QuestionKey, string>
+
+/** Japanese dictionary, checked complete against the zh key set. */
+export const ja = {
+  'error.incomplete': '先にこの質問を完了してください。',
+  'error.unanswered': '選択肢を選ぶか、回答を入力してください。',
+  'nav.prev': '前の質問',
+  'nav.next': '次の質問',
+  'nav.minimize': '質問カードを折りたたむ',
+  'nav.maximize': '質問カードを展開',
+  'nav.cancel': 'すべての質問を破棄',
+  'option.recommended': 'おすすめ',
+  'custom.placeholder': '回答を入力',
+  'action.skip': 'この質問をスキップ',
+  'action.next': '次へ',
+  'plan.header': '計画の確認',
+  'plan.approve': '承認',
+  'plan.decline': '拒否',
+  'plan.discuss': 'チャットで相談',
+} satisfies Record<QuestionKey, string>

@@ -1,31 +1,33 @@
 /**
- * Separate byte-identical Chinese Markdown code blocks from the primary checks
- * performed on their unsuffixed English siblings. The bilingual pairing gate
+ * Separate byte-identical translated Markdown code blocks from the primary
+ * checks performed on their unsuffixed English siblings. The translation pairing gate
  * owns cross-language identity; source-oriented gates consume one copy.
  */
 
-/** The result of separating canonical blocks from paired Chinese derivatives. */
+/** The result of separating canonical blocks from translated derivatives. */
 export interface MarkdownDerivativePartition<T> {
   /** Blocks that still require the caller's owning check. */
   primary: T[]
-  /** Chinese blocks covered by the byte-identical unsuffixed sequence. */
+  /** Translated blocks covered by the byte-identical unsuffixed sequence. */
   derivatives: T[]
 }
 
-/** Return the unsuffixed sibling of a Chinese Markdown path. */
+/** Return the unsuffixed sibling of a translated Markdown path. */
 function unsuffixedSibling(doc: string): string | null {
-  return doc.endsWith('.zh.md') ? `${doc.slice(0, -'.zh.md'.length)}.md` : null
+  if (doc.endsWith('.zh.md')) return `${doc.slice(0, -'.zh.md'.length)}.md`
+  if (doc.endsWith('.ja.md')) return `${doc.slice(0, -'.ja.md'.length)}.md`
+  return null
 }
 
 /**
- * Partition complete byte-identical `.zh.md` block sequences from primary
+ * Partition complete byte-identical translated block sequences from primary
  * blocks. A partial or reordered match stays primary so the caller fails
  * closed; the translation-pairing gate reports the cross-language mismatch.
  *
  * @param blocks - Blocks in repository scan order.
  * @param docOf - Repository-relative Markdown path owning a block.
  * @param fingerprintOf - Block kind/info string plus byte-exact body.
- * @returns Primary blocks and paired Chinese derivatives, preserving order.
+ * @returns Primary blocks and translated derivatives, preserving order.
  */
 export function partitionPairedMarkdownDerivatives<T>(
   blocks: readonly T[],

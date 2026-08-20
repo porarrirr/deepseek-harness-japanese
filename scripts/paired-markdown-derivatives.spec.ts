@@ -28,6 +28,19 @@ describe('partitionPairedMarkdownDerivatives', () => {
     })
   })
 
+  it('treats a complete byte-identical Japanese sequence as derivative', () => {
+    const english = [
+      { doc: 'docs/example.md', kind: 'ts', code: 'const one = 1' },
+      { doc: 'docs/example.md', kind: 'type-equiv', code: 'interface Example {}' },
+    ]
+    const japanese = english.map(block => ({ ...block, doc: 'docs/example.ja.md' }))
+
+    expect(partition([...english, ...japanese])).toEqual({
+      primary: english,
+      derivatives: japanese,
+    })
+  })
+
   it('keeps reordered, changed, partial, and orphan Chinese sequences primary', () => {
     const sequence = (doc: string) => [
       { doc, kind: 'ts', code: 'const one = 1' },

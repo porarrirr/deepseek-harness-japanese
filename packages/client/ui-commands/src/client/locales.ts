@@ -26,3 +26,15 @@ export const en = {
   'listbox.aria': '/{command} matches',
   'notice.imagesUnsupported': '/{command} does not accept image attachments; remove them first',
 } satisfies Record<CommandKey, string>
+
+/** Japanese dictionary, checked complete against the zh key set. */
+export const ja = {
+  'search.placeholder': '検索…',
+  'search.aria': '選択肢を絞り込む',
+  'status.loading': '選択肢を読み込み中…',
+  'status.applying': '適用中…',
+  'status.empty': '選択肢なし',
+  'overlay.aria': '/{command} の選択肢',
+  'listbox.aria': '/{command} の一致項目',
+  'notice.imagesUnsupported': '/{command} は画像添付に対応していません。先に画像を削除してください',
+} satisfies Record<CommandKey, string>

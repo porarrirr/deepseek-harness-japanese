@@ -206,6 +206,8 @@ export function computeMechanicalUpdate(confirmedSource: string, currentSource: 
 export interface TerminologyRow {
   english: string
   chinese: string
+  /** Japanese rendering when the row belongs to the Japanese terminology table. */
+  japanese: string
   /** The 首次出现 cell (first-occurrence rendering), possibly empty. */
   first: string
   /** The verbatim table row. */
@@ -225,13 +227,29 @@ function plainTerm(cell: string): string {
  */
 export function parseTerminologyRows(terminology: string): TerminologyRow[] {
   const rows: TerminologyRow[] = []
+  let tableLanguage: 'Chinese' | 'Japanese' = 'Chinese'
   for (const line of terminology.split('\n')) {
     if (!line.startsWith('|')) continue
+    if (/^\| English \| 日本語 \|/.test(line)) {
+      tableLanguage = 'Japanese'
+      continue
+    }
+    if (/^\| English \| 中文 \|/.test(line)) {
+      tableLanguage = 'Chinese'
+      continue
+    }
     if (/^\|[\s:|-]+\|$/.test(line)) continue
     const cells = line.split('|').map(cell => cell.trim())
     const english = plainTerm(cells[1] ?? '')
     if (english === '' || english === 'English') continue
-    rows.push({ english, chinese: plainTerm(cells[2] ?? ''), first: plainTerm(cells[3] ?? ''), line })
+    const translation = plainTerm(cells[2] ?? '')
+    rows.push({
+      english,
+      chinese: tableLanguage === 'Chinese' ? translation : '',
+      japanese: tableLanguage === 'Japanese' ? translation : '',
+      first: tableLanguage === 'Chinese' ? plainTerm(cells[3] ?? '') : '',
+      line,
+    })
   }
   return rows
 }
@@ -259,13 +277,18 @@ export function termOffsets(text: string, term: string, englishInflections = fal
   return [...text.matchAll(expression)].map(match => match.index)
 }
 
-/** The two update directions a pair supports. */
-export type BriefDirection = 'en-to-zh' | 'zh-to-en'
+/** Update directions supported by the briefing workflow. */
+export type BriefDirection = 'en-to-zh' | 'zh-to-en' | 'en-to-ja' | 'ja-to-en'
 
 /** Whether a row's source-language term occurs in the given text. */
 function rowOccurs(row: TerminologyRow, direction: BriefDirection, text: string): boolean {
-  const terms = direction === 'en-to-zh' ? [row.english] : [row.first, row.chinese].filter(term => /[一-鿿]/.test(term))
-  return terms.some(term => termOffsets(text, term, direction === 'en-to-zh').length > 0)
+  const sourceIsEnglish = direction === 'en-to-zh' || direction === 'en-to-ja'
+  const terms = sourceIsEnglish
+    ? ((direction === 'en-to-zh' ? row.chinese : row.japanese) === '' ? [] : [row.english])
+    : direction === 'zh-to-en'
+      ? [row.first, row.chinese].filter(term => /[一-鿿]/.test(term))
+      : [row.japanese].filter(term => term !== '')
+  return terms.some(term => termOffsets(text, term, sourceIsEnglish).length > 0)
 }
 
 /**
@@ -403,9 +426,48 @@ const EN_TARGET_DIGEST = [
   '- One physical line per paragraph; exactly one trailing newline.',
 ]
 
+const JA_TARGET_DIGEST = [
+  '- Edit ONLY what the change requires; preserve the reviewed phrasing of everything unchanged.',
+  '- Nothing added, nothing dropped: the Japanese must state exactly what the new English states.',
+  '- Write natural, professional Japanese developer prose, not a word-by-word gloss; terse stays terse.',
+  '- Code fences byte-identical to the English side, comments included; inline code spans, identifiers, and paths remain verbatim.',
+  '- Relative links keep the `.md` target; only the switcher line links `.ja.md` and the other language counterparts.',
+  '- Structure mirrors the counterpart: heading depths and order, list kinds and item counts, table rows and columns.',
+  '- Use Japanese punctuation and polite technical instructions without unnecessary honorific phrasing.',
+  '- One physical line per paragraph; exactly one trailing newline.',
+]
+
+const JA_TO_EN_DIGEST = [
+  '- Edit ONLY what the change requires; preserve the reviewed phrasing of everything unchanged.',
+  '- Nothing added, nothing dropped: the English must state exactly what the new Japanese states.',
+  '- Write concise professional developer prose, not word-by-word gloss; terse stays terse.',
+  '- Code fences byte-identical to the Japanese side, comments included; inline code spans verbatim.',
+  '- Relative links keep the `.md` target; only the switcher line links `.ja.md`.',
+  '- Structure mirrors the counterpart: heading depths and order, list kinds and item counts, table rows and columns.',
+  '- One physical line per paragraph; exactly one trailing newline.',
+]
+
+function assertNever(value: never): never {
+  throw new Error(`translation brief: unsupported direction ${String(value)}`)
+}
+
+function directionLanguages(direction: BriefDirection): { source: string; counterpart: string } {
+  switch (direction) {
+    case 'en-to-zh':
+      return { source: 'English', counterpart: 'Chinese' }
+    case 'zh-to-en':
+      return { source: 'Chinese', counterpart: 'English' }
+    case 'en-to-ja':
+      return { source: 'English', counterpart: 'Japanese' }
+    case 'ja-to-en':
+      return { source: 'Japanese', counterpart: 'English' }
+    default:
+      return assertNever(direction)
+  }
+}
+
 function renderBundles(out: string[], input: TranslationBriefInput, bundles: BriefBundle[], firstOccurrenceNotes: string[]): void {
-  const sourceLanguage = input.direction === 'en-to-zh' ? 'English' : 'Chinese'
-  const counterpartLanguage = input.direction === 'en-to-zh' ? 'Chinese' : 'English'
+  const { source: sourceLanguage, counterpart: counterpartLanguage } = directionLanguages(input.direction)
   for (const bundle of bundles) {
     out.push('')
     out.push(`### #${bundle.index} ${bundle.label}${bundle.reason === 'first-occurrence' ? ' — unchanged; included for a first-occurrence move' : ''} — counterpart at ${input.counterpartPath}:${bundle.counterpartStartLine}`)
@@ -439,6 +501,10 @@ function renderBundles(out: string[], input: TranslationBriefInput, bundles: Bri
   }
 }
 
+function englishAnchorOfPath(path: string): string {
+  return path.replace(/\.(?:zh|ja)\.md$/, '.md')
+}
+
 /**
  * Render the complete briefing for one out-of-sync pair.
  *
@@ -446,8 +512,8 @@ function renderBundles(out: string[], input: TranslationBriefInput, bundles: Bri
  * @returns Markdown briefing text.
  */
 export function renderTranslationBrief(input: TranslationBriefInput): string {
-  const sourceLanguage = input.direction === 'en-to-zh' ? 'English' : 'Chinese'
-  const counterpartLanguage = input.direction === 'en-to-zh' ? 'Chinese' : 'English'
+  const { source: sourceLanguage, counterpart: counterpartLanguage } = directionLanguages(input.direction)
+  const englishAnchor = englishAnchorOfPath(input.sourcePath)
   const out: string[] = []
   out.push(`# Translation update briefing: ${input.sourcePath}`)
   out.push('')
@@ -487,26 +553,43 @@ export function renderTranslationBrief(input: TranslationBriefInput): string {
     default:
       input.scope satisfies never
   }
-  if (input.terminology.length > 0) {
+  const japaneseDirection = input.direction === 'en-to-ja' || input.direction === 'ja-to-en'
+  const terminology = japaneseDirection
+    ? input.terminology.filter(row => row.japanese !== '')
+    : input.terminology
+  if (terminology.length > 0) {
     out.push('')
     out.push('## Binding terminology rows matching this change (docs/i18n/terminology.md)')
     out.push('')
-    out.push('| English | 中文 | 首次出现 | 不要译作 | 备注 |')
-    out.push('|---|---|---|---|---|')
-    for (const row of input.terminology) out.push(row.line)
+    if (japaneseDirection) {
+      out.push('| English | 日本語 | 备注 |')
+      out.push('|---|---|---|')
+      for (const row of terminology) out.push(`| ${row.english} | ${row.japanese} | |`)
+    } else {
+      out.push('| English | 中文 | 首次出现 | 不要译作 | 备注 |')
+      out.push('|---|---|---|---|---|')
+      for (const row of terminology) out.push(row.line)
+    }
     out.push('')
     out.push('For any term you introduce that is not listed above, consult the full table before inventing a rendering.')
   }
   out.push('')
   out.push('## Rules digest (full rules: docs/i18n/translation-rules.md)')
   out.push('')
-  out.push(...(input.direction === 'en-to-zh' ? ZH_TARGET_DIGEST : EN_TARGET_DIGEST))
+  const digest = input.direction === 'en-to-zh'
+    ? ZH_TARGET_DIGEST
+    : input.direction === 'en-to-ja'
+      ? JA_TARGET_DIGEST
+      : input.direction === 'ja-to-en'
+        ? JA_TO_EN_DIGEST
+        : EN_TARGET_DIGEST
+  out.push(...digest)
   out.push('')
   out.push('## Finish')
   out.push('')
   out.push('1. Apply the smallest counterpart edit that covers the change, then verify the changed spans clause by clause against the source.')
-  out.push(`2. \`pnpm run verify-translation-pairing --write ${input.sourcePath.replace(/\.zh\.md$/, '.md')}\``)
-  out.push(`3. \`pnpm run verify-translation-pairing ${input.sourcePath.replace(/\.zh\.md$/, '.md')}\``)
+  out.push(`2. \`pnpm run verify-translation-pairing --write ${englishAnchor}\``)
+  out.push(`3. \`pnpm run verify-translation-pairing ${englishAnchor}\``)
   out.push('')
   return out.join('\n')
 }

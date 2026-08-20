@@ -22,3 +22,13 @@ export const en = {
   'openDocument.error': 'Could not open configuration file',
   'general.nav': 'General',
 } satisfies Record<SettingsKey, string>
+
+/** Japanese dictionary, checked complete against the zh key set. */
+export const ja = {
+  'trigger': '設定',
+  'title': '設定',
+  'close': '閉じる',
+  'openDocument': '設定ファイルを開く',
+  'openDocument.error': '設定ファイルを開けませんでした',
+  'general.nav': '一般',
+} satisfies Record<SettingsKey, string>

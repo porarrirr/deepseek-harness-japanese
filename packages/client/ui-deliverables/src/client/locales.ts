@@ -21,5 +21,14 @@ export const en: Record<DeliverablesKey, string> = {
   'produced.showInFolder': 'Show in folder',
 }
 
+/** Japanese dictionary, key-identical to the Chinese source of truth. */
+export const ja: Record<DeliverablesKey, string> = {
+  'produced.label': '生成物',
+  'produced.moreOne': '+ 1 ファイル',
+  'produced.more': '+ {count} ファイル',
+  'produced.open': '{name} を開く',
+  'produced.showInFolder': 'フォルダーに表示',
+}
+
 /** Union of this namespace's dictionary keys. */
 export type DeliverablesKey = keyof typeof zh

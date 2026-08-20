@@ -1,0 +1,45 @@
+- dialog "設定":
+  - navigation:
+    - text: 設定
+    - button "一般":
+      - img
+      - text: 一般
+    - button "モデル":
+      - img
+      - text: モデル
+    - button "プラグイン":
+      - img
+      - text: プラグイン
+    - button "エージェントプリセット":
+      - img
+      - text: エージェントプリセット
+  - button "設定ファイルを開く"
+  - button "閉じる":
+    - img
+    - text: 閉じる
+  - text: エージェントプリセット これから開始するセッションに適用されます。実行中のセッションは開始時のプリセットを使い続けます。
+  - button "標準モード":
+    - text: 標準モード
+    - img
+  - text: 権限 新しいセッションのデフォルト権限モードを選択
+  - button "Workspace Write":
+    - text: Workspace Write
+    - img
+  - text: 言語
+  - button "日本語":
+    - text: 日本語
+    - img
+  - text: 外観
+  - button "ライト":
+    - img
+    - text: ライト
+  - button "ダーク":
+    - img
+    - text: ダーク
+  - button "システムに合わせる" [pressed]:
+    - img
+    - text: システムに合わせる
+  - text: 実行中の Enter キーの動作 エージェント実行中のみ有効。Cmd/Ctrl+Enter では別の動作になります
+  - button "キューに追加して送信":
+    - text: キューに追加して送信
+    - img

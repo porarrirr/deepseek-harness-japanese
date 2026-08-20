@@ -171,6 +171,10 @@ describe('directory-picker-browse client half', () => {
     expect(injected.t('browser.title')).toBe('选择工作区目录')
     expect(injected.t('browser.newFolder')).toBe('新建文件夹')
     expect(injected.t('browser.showHidden')).toBe('显示隐藏文件')
+    b.ctx.get('locale')!.setLocale('ja')
+    expect(injected.t('browser.title')).toBe('ワークスペースのディレクトリを選択')
+    expect(injected.t('browser.newFolder')).toBe('新しいフォルダー')
+    expect(injected.t('browser.showHidden')).toBe('隠しファイルを表示')
   })
 
   it('drives the injected browse calls through the hole entry', async () => {

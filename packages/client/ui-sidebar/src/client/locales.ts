@@ -18,3 +18,11 @@ export const en = {
   'toggle.open': 'Open sidebar',
   'toggle.collapse': 'Collapse sidebar',
 } satisfies Record<SidebarKey, string>
+
+/** Japanese dictionary, checked complete against the zh key set. */
+export const ja = {
+  'session.new': '新しいセッション',
+  'session.new.label': '新しいセッション',
+  'toggle.open': 'サイドバーを開く',
+  'toggle.collapse': 'サイドバーを折りたたむ',
+} satisfies Record<SidebarKey, string>

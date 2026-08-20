@@ -18,3 +18,11 @@ export const en = {
   'appearance.dark': 'Dark',
   'appearance.system': 'System',
 } satisfies Record<ThemeKey, string>
+
+/** Japanese dictionary, checked complete against the zh key set. */
+export const ja = {
+  'appearance.title': '外観',
+  'appearance.light': 'ライト',
+  'appearance.dark': 'ダーク',
+  'appearance.system': 'システムに合わせる',
+} satisfies Record<ThemeKey, string>

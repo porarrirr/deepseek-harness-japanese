@@ -129,6 +129,12 @@ const TERMINOLOGY = [
   '| registry | 注册表 | | | |',
 ].join('\n')
 
+const JAPANESE_TERMINOLOGY = [
+  '| English | 日本語 | 备注 |',
+  '|---|---|---|',
+  '| language switcher | 言語切替行 | |',
+].join('\n')
+
 describe('terminology', () => {
   it('parses data rows and skips the header and separator', () => {
     const rows = parseTerminologyRows(TERMINOLOGY)
@@ -148,6 +154,11 @@ describe('terminology', () => {
       .toEqual(['agent', 'session log'])
     expect(relevantTerminologyRows(TERMINOLOGY, 'zh-to-en', '门禁在提交时运行。').map(row => row.english))
       .toEqual(['gate'])
+    expect(parseTerminologyRows(JAPANESE_TERMINOLOGY)[0]).toMatchObject({ english: 'language switcher', japanese: '言語切替行' })
+    expect(relevantTerminologyRows(JAPANESE_TERMINOLOGY, 'ja-to-en', '言語切替行を確認する。').map(row => row.english))
+      .toEqual(['language switcher'])
+    expect(relevantTerminologyRows(JAPANESE_TERMINOLOGY, 'en-to-ja', 'Update the language switcher.').map(row => row.english))
+      .toEqual(['language switcher'])
     expect(relevantTerminologyRows(TERMINOLOGY, 'en-to-zh', 'delegate the work')).toEqual([])
   })
 })
@@ -267,6 +278,36 @@ describe('brief rendering', () => {
     })
     expect(brief).toContain('exactly what the new Chinese states')
     expect(brief).toContain('verify-translation-pairing --write docs/foo.md')
+  })
+
+  it('renders the Japanese-target digest and counterpart language', () => {
+    const brief = renderTranslationBrief({
+      ...base,
+      direction: 'en-to-ja',
+      counterpartPath: 'docs/foo.ja.md',
+      terminology: parseTerminologyRows(JAPANESE_TERMINOLOGY),
+      scope: { kind: 'units', bundles: [{ ...bundle, counterpartText: 'agent の新しいテキスト\n' }], firstOccurrenceNotes: [] },
+    })
+    expect(brief).toContain('Current Japanese (bring this along):')
+    expect(brief).toContain('natural, professional Japanese developer prose')
+    expect(brief).toContain('| language switcher | 言語切替行 | |')
+    expect(brief).toContain('verify-translation-pairing --write docs/foo.md')
+  })
+
+  it('normalizes a Japanese source path in the English-target Finish commands', () => {
+    const brief = renderTranslationBrief({
+      ...base,
+      direction: 'ja-to-en',
+      sourcePath: 'docs/foo.ja.md',
+      counterpartPath: 'docs/foo.md',
+      scope: { kind: 'document', reason: 'Japanese and English both changed.' },
+      terminology: [],
+    })
+    expect(brief).toContain('The Japanese side changed')
+    expect(brief).toContain('exactly what the new Japanese states')
+    expect(brief).toContain('verify-translation-pairing --write docs/foo.md')
+    expect(brief).toContain('verify-translation-pairing docs/foo.md')
+    expect(brief).not.toContain('verify-translation-pairing --write docs/foo.ja.md')
   })
 
   it('grows bundle fences past tilde runs in the text', () => {

@@ -8,6 +8,8 @@ Follow the [root instructions](../AGENTS.md), the [documentation standard](../do
 
 Keep canonical prose and generated catalogs in their owning `docs/` tier, then expose selected pages through [docs.ts](docs.ts). Never add locale, route, API, or copied documentation trees such as `website/zh-CN/`, `website/en/`, or `website/api/`.
 
+Published documentation uses the repository's sibling source files: `foo.md`, `foo.zh.md`, and `foo.ja.md`; the manifest projects them to `/en/`, `/`, and `/ja/`. Sources that intentionally lack a reviewed translation may use the manifest's mirrored English fallback.
+
 The projector writes disposable Markdown to the ignored `website/.generated/` directory. Never edit or commit `.generated/`, `.cache/`, or `.dist/`.
 
 Run `pnpm docs:check` after changing this subtree; the gate rejects additional non-ignored Markdown under `website/`.

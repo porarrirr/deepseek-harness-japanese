@@ -83,6 +83,8 @@ describe('document language', () => {
     expect(langOf()).toBe('en')
     locale.setLocale('zh')
     expect(langOf()).toBe('zh-CN')
+    locale.setLocale('ja')
+    expect(langOf()).toBe('ja')
   })
 
   it('follows an explicit Host preference that overrides browser detection', async () => {

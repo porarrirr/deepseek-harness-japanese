@@ -1,6 +1,6 @@
 # 服务与依赖
 
-[English](service.md) | 中文
+[English](service.md) | 中文 | [日本語](service.ja.md)
 
 服务是一个插件向其他插件公开的能力。inject 声明插件需要哪些服务。
 

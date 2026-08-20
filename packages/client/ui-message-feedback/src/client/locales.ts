@@ -43,3 +43,20 @@ export const en = {
   'error.load': 'Could not load feedback',
   'error.generic': 'Could not save feedback',
 } satisfies Record<MessageFeedbackKey, string>
+
+/** Japanese dictionary, checked complete against the zh key set. */
+export const ja = {
+  'action.like': '良い回答',
+  'action.likeActive': '評価を取り消す',
+  'action.dislike': '問題のある回答',
+  'action.dislikeActive': '評価を取り消す',
+  'note.open': 'メモを追加',
+  'note.dialog': 'フィードバック',
+  'note.placeholder': '良かった点、または問題点を入力（任意）',
+  'note.save': '保存',
+  'note.cancel': 'キャンセル',
+  'note.aria': 'フィードバックメモ',
+  'error.conflict': 'このフィードバックは別の場所で変更されました。最新の状態を表示しています',
+  'error.load': 'フィードバックを読み込めませんでした',
+  'error.generic': 'フィードバックを保存できませんでした',
+} satisfies Record<MessageFeedbackKey, string>

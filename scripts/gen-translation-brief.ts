@@ -16,7 +16,9 @@ import { existsSync, globSync, mkdtempSync, readFileSync, rmSync, writeFileSync 
 import { tmpdir } from 'node:os'
 import { basename, join, resolve, sep } from 'node:path'
 import {
+  isPublicTranslationSource,
   isTranslationScopeFile,
+  languageSwitcherTargets,
   pairAnchorOfArgument,
   parseTranslationMarkdown,
   parseTranslationPairingManifest,
@@ -91,42 +93,65 @@ function diffTexts(before: string, after: string): string {
 interface PairState {
   anchor: string
   zh: string
+  ja: string
   meta: string
+  published: boolean
   enDrifted: boolean
   zhDrifted: boolean
+  jaDrifted: boolean
   enLast: string
   zhLast: string
+  jaLast: string | undefined
 }
 
 /** Load one pair's recorded and current state, or explain why it cannot be briefed. */
 function loadPair(anchor: string): PairState | string {
   const zh = anchor.replace(/\.md$/, '.zh.md')
+  const ja = anchor.replace(/\.md$/, '.ja.md')
   const meta = anchor.replace(/\.md$/, '.i18n.yaml')
   if (!isTranslationScopeFile(anchor) || isExcluded(anchor)) {
     return `${anchor}: not an in-scope documentation pair (docs/i18n/README.md)`
   }
-  const missing = [anchor, zh, meta].filter(file => !existsSync(join(root, file)))
+  const published = isPublicTranslationSource(anchor)
+  const required = published ? [anchor, zh, ja, meta] : [anchor, zh, meta]
+  const missing = required.filter(file => !existsSync(join(root, file)))
   if (missing.length > 0) {
     return `${anchor}: incomplete pair (missing ${missing.join(', ')}) — a new counterpart is whole-document translation work, not a minimal update`
+  }
+  if (!published && existsSync(join(root, ja))) {
+    return `${ja}: non-public documentation cannot be briefed as a Japanese pair`
   }
   const record = parseMeta(readFileSync(join(root, meta), 'utf8'))
   const enRecorded = record?.get(basename(anchor))
   const zhRecorded = record?.get(basename(zh))
-  if (record === undefined || enRecorded === undefined || zhRecorded === undefined) {
+  const jaRecorded = record?.get(basename(ja))
+  if (
+    record === undefined
+    || record.size !== (published ? 3 : 2)
+    || enRecorded === undefined
+    || zhRecorded === undefined
+    || (published ? jaRecorded === undefined : jaRecorded !== undefined)
+  ) {
     return `${meta}: malformed consistency record`
   }
   const enCurrent = readFileSync(join(root, anchor), 'utf8')
   const zhCurrent = readFileSync(join(root, zh), 'utf8')
+  const jaCurrent = published ? readFileSync(join(root, ja), 'utf8') : undefined
   const enLast = blobText(enRecorded)
   const zhLast = blobText(zhRecorded)
+  const jaLast = published && jaRecorded !== undefined ? blobText(jaRecorded) : undefined
   return {
     anchor,
     zh,
+    ja,
     meta,
+    published,
     enDrifted: enCurrent !== enLast,
     zhDrifted: zhCurrent !== zhLast,
+    jaDrifted: published && jaCurrent !== jaLast,
     enLast,
     zhLast,
+    jaLast,
   }
 }
 
@@ -164,6 +189,10 @@ interface PlannedBrief {
   changedText: string
   /** Computed counterpart for a mechanical scope, for `--apply`. */
   mechanicalResult?: string | undefined
+}
+
+function assertNever(value: never): never {
+  throw new Error(`gen-translation-brief: unsupported direction ${String(value)}`)
 }
 
 /** Choose the narrowest safely mapped granularity for one drifted side. */
@@ -213,14 +242,19 @@ function planScope(
 }
 
 /** Validate a computed mechanical counterpart and write it. */
-function applyMechanical(counterpartPath: string, sourceCurrent: string, result: string): void {
-  const counterpartBase = basename(counterpartPath)
-  const sourceBase = counterpartBase.endsWith('.zh.md')
-    ? counterpartBase.replace(/\.zh\.md$/, '.md')
-    : counterpartBase.replace(/\.md$/, '.zh.md')
+function switcherTargetsFor(sourcePath: string): string[] {
+  const anchor = pairAnchorOfArgument(sourcePath)
+  const zh = anchor.replace(/\.md$/, '.zh.md')
+  const targets = [anchor, zh]
+  if (isPublicTranslationSource(anchor)) targets.push(anchor.replace(/\.md$/, '.ja.md'))
+  return [...new Set(targets.flatMap(languageSwitcherTargets))]
+}
+
+function applyMechanical(sourcePath: string, counterpartPath: string, sourceCurrent: string, result: string): void {
+  const switcherTargets = switcherTargetsFor(sourcePath)
   const errors = translationStructureDiff(
-    translationStructureSignature(parseTranslationMarkdown(sourceCurrent), counterpartBase),
-    translationStructureSignature(parseTranslationMarkdown(result), sourceBase),
+    translationStructureSignature(parseTranslationMarkdown(sourceCurrent), switcherTargets),
+    translationStructureSignature(parseTranslationMarkdown(result), switcherTargets),
   )
   if (errors.length > 0) {
     throw new Error(`gen-translation-brief: computed mechanical update for ${counterpartPath} violates the pair structure: ${errors.join('; ')}`)
@@ -231,16 +265,45 @@ function applyMechanical(counterpartPath: string, sourceCurrent: string, result:
 
 /** Render (and under `--apply`, apply) the briefing for one drifted side. */
 function briefDirection(pair: PairState, direction: BriefDirection, apply: boolean): string {
-  const sourceIsEnglish = direction === 'en-to-zh'
-  const sourcePath = sourceIsEnglish ? pair.anchor : pair.zh
-  const counterpartPath = sourceIsEnglish ? pair.zh : pair.anchor
-  const sourceLast = sourceIsEnglish ? pair.enLast : pair.zhLast
+  let sourcePath: string
+  let counterpartPath: string
+  let sourceLast: string
+  let bothDrifted: boolean
+  switch (direction) {
+    case 'en-to-zh':
+      sourcePath = pair.anchor
+      counterpartPath = pair.zh
+      sourceLast = pair.enLast
+      bothDrifted = pair.enDrifted && pair.zhDrifted
+      break
+    case 'zh-to-en':
+      sourcePath = pair.zh
+      counterpartPath = pair.anchor
+      sourceLast = pair.zhLast
+      bothDrifted = pair.zhDrifted && pair.enDrifted
+      break
+    case 'en-to-ja':
+      sourcePath = pair.anchor
+      counterpartPath = pair.ja
+      sourceLast = pair.enLast
+      bothDrifted = pair.enDrifted && pair.jaDrifted
+      break
+    case 'ja-to-en':
+      sourcePath = pair.ja
+      counterpartPath = pair.anchor
+      if (pair.jaLast === undefined) throw new Error(`gen-translation-brief: ${pair.anchor} has no recorded Japanese side`)
+      sourceLast = pair.jaLast
+      bothDrifted = pair.jaDrifted && pair.enDrifted
+      break
+    default:
+      assertNever(direction)
+  }
   const sourceCurrent = readFileSync(join(root, sourcePath), 'utf8')
   const counterpartCurrent = readFileSync(join(root, counterpartPath), 'utf8')
   const diff = diffTexts(sourceLast, sourceCurrent)
-  const planned = planScope(sourceLast, sourceCurrent, counterpartCurrent, direction, pair.enDrifted && pair.zhDrifted)
+  const planned = planScope(sourceLast, sourceCurrent, counterpartCurrent, direction, bothDrifted)
   if (apply && planned.mechanicalResult !== undefined) {
-    applyMechanical(counterpartPath, sourceCurrent, planned.mechanicalResult)
+    applyMechanical(sourcePath, counterpartPath, sourceCurrent, planned.mechanicalResult)
   }
   return renderTranslationBrief({
     sourcePath,
@@ -283,12 +346,16 @@ for (const anchor of anchors) {
     if (requested.length > 0) problems.push(pair)
     continue
   }
-  if (!pair.enDrifted && !pair.zhDrifted) {
+  if (!pair.enDrifted && !pair.zhDrifted && !pair.jaDrifted) {
     if (requested.length > 0) skipped.push(`${anchor}: pair is consistent with its record — nothing to brief`)
     continue
   }
-  if (pair.enDrifted) briefs.push(briefDirection(pair, 'en-to-zh', applyMode))
+  if (pair.enDrifted) {
+    briefs.push(briefDirection(pair, 'en-to-zh', applyMode))
+    if (pair.published) briefs.push(briefDirection(pair, 'en-to-ja', applyMode))
+  }
   if (pair.zhDrifted) briefs.push(briefDirection(pair, 'zh-to-en', applyMode))
+  if (pair.jaDrifted) briefs.push(briefDirection(pair, 'ja-to-en', applyMode))
 }
 
 if (problems.length > 0 || skipped.length > 0) {

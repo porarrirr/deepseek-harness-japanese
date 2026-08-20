@@ -8,13 +8,13 @@
 
 | 占位符 | 填入内容 | 来源 |
 |---|---|---|
-| `{{source_lang}}` | 源语言名（`English` / `Chinese`） | 由改动侧文件推断：`.zh.md` 被改则为 `Chinese` |
-| `{{target_lang}}` | 目标语言名（`Chinese` / `English`） | 与 `{{source_lang}}` 相对 |
+| `{{source_lang}}` | 源语言名（`English` / `Chinese` / `Japanese`） | 由改动侧文件推断：`.zh.md` 被改则为 `Chinese`，`.ja.md` 被改则为 `Japanese` |
+| `{{target_lang}}` | 目标语言名（`Chinese` / `Japanese` / `English`） | 由请求方向确定；未指定目标语言时保留现有英中默认方向 |
 | `{{terminology}}` | [terminology.md](terminology.md) 的完整表格（Markdown 原文） | 渲染时读取仓库当前版本，不缓存 |
 
 流水线只识别上表中的占位符，并且一次翻译整篇文档。它不支持 `{{to}}`、`{{title_prompt}}`、`{{summary_prompt}}`、`{{terms_prompt}}`、`{{imt_style_guide}}`、`{{translation_rules}}` 或 `%%` 分段协议；输出采用模板正文规定的三段 XML，流水线解析取 `<final>` 段。
 
-语言切换行：已有配对的源文件自带切换行，模型按模板规则翻转即可。全新配对的源文件没有切换行，模型也无从得知文件名——此时由流水线在解析 `<final>` 后按目标文件名插入或校正切换行（机械后处理，配对门禁兜底校验）。
+语言切换行：已有配对的源文件自带切换行，模型按模板规则翻转即可。全新配对的源文件没有切换行，模型也无从得知文件名——此时由流水线在解析 `<final>` 后按目标文件名插入或校正切换行（机械后处理，配对门禁兜底校验）。日本語文件使用 `.ja.md`；英日配对的日本語目标行是 `[English](foo.md) | [中文](foo.zh.md) | 日本語`，英文目标行是 `English | [中文](foo.zh.md) | [日本語](foo.ja.md)`。
 
 ## Few-shot 金标
 
@@ -27,6 +27,8 @@
 - `.agents/notes/implemented/process/2026-07-02-bilingual-docs-and-pairing-gate.md` ↔ 对应 `.zh.md`
 
 注入方式：在系统消息（本模板）之后、待译文档之前，每组作为一轮示例对话——user 消息为源文档全文，assistant 消息为定稿译文全文（裸文本，不带三段 XML 包装；只有真实请求要求三段输出）。上下文不足时按上列顺序从后往前删减组数。这 5 组也是评审校准锚点（见 [style-samples.md](style-samples.md)），改动任何一组即改变流水线行为。
+
+模板正文的 Examples 还包含英日对照例，用于校准自然的日本語技术文体；它们不替代请求中注入的整篇文档 few-shot。
 
 ## 模板正文
 
@@ -57,7 +59,7 @@ A lower-priority rule may refine but never override a higher-priority requiremen
 - Fenced code blocks must be byte-identical to the source, including info strings, whitespace, and ALL comments inside them. Do NOT translate or reformat any content inside code blocks. This is a hard rule with no exceptions.
 - Inline code spans must be kept verbatim. This includes commands, flags, paths, identifiers, API and event names, config keys, protocol values, version numbers, and other machine-readable tokens. Never translate or reformat them.
 - Every relative link must point to the same target as in the source. Translate link text; do not change link targets.
-- Language switcher line: when an English source contains `English | [中文](source-filename.zh.md)`, write `[English](source-filename.md) | 中文`. When a Chinese source contains `[English](source-filename.md) | 中文`, write `English | [中文](source-filename.zh.md)`. Do NOT copy the source switcher unchanged. If the source has no switcher, do not invent a filename or switcher; the pipeline inserts the canonical target switcher after parsing `<final>`.
+- Language switcher line: for the existing English↔Chinese pair, when an English source contains `English | [中文](source-filename.zh.md)`, write `[English](source-filename.md) | 中文`, and when a Chinese source contains `[English](source-filename.md) | 中文`, write `English | [中文](source-filename.zh.md)`. For a Japanese target, write `[English](source-filename.md) | [中文](source-filename.zh.md) | 日本語`; for a Japanese source translated to English, write `English | [中文](source-filename.zh.md) | [日本語](source-filename.ja.md)`. Do NOT copy the source switcher unchanged. If the source has no switcher, do not invent a filename or switcher; the pipeline inserts the canonical target switcher after parsing `<final>`.
 - Preserve emphasis marker types and the semantic spans they cover. Do not add, remove, move, or change bold and italic markers.
 
 ### Faithfulness
@@ -71,7 +73,7 @@ A lower-priority rule may refine but never override a higher-priority requiremen
 - Write in a professional, formal tone appropriate for developer documentation. Never use colloquial or casual expressions.
 - Name an actor when the target language would otherwise obscure an actor that the source states or unambiguously implies. Never invent responsibility merely to avoid a passive construction.
 - Prefer established target-language engineering terms over literal renderings. Replace metaphors with direct descriptions that preserve the source meaning.
-- Use polite imperative forms where the text instructs the reader to do something. In Chinese, address the reader as `你`, not `您`.
+- Use polite imperative forms where the text instructs the reader to do something. In Chinese, address the reader as `你`, not `您`. In Japanese, use natural formal technical prose and polite instructions such as `〜してください`; do not use literal or excessively honorific phrasing.
 - Keep the author's register: concise stays concise, detailed stays detailed.
 
 ### Sentence Structure
@@ -93,6 +95,11 @@ A lower-priority rule may refine but never override a higher-priority requiremen
 #### When translating into Chinese
 - When a number modifies a noun, include a natural Chinese classifier or measure word when Chinese grammar requires one. For example: "three-role capability seam" → "包含三种角色的能力 seam", not "三角色 seam". Do not add classifiers to code, identifiers, versions, units, or fixed names.
 
+#### When translating into Japanese
+- Use established Japanese engineering terms and write sentences a native technical author would use; avoid source-order calques, unnecessary katakana, and sentence-final noun fragments.
+- Preserve proper nouns, package names, paths, commands, identifiers, API and event names, config keys, protocol values, and version numbers exactly. Never translate or reformat inline code spans or any code-fence content, including comments and info strings.
+- Keep the author's register and logical subjects, conditions, negation, modality, and contract strength. Omit a subject only when Japanese grammar leaves the actor unambiguous; never invent an actor to avoid a passive construction.
+
 ### Punctuation
 
 #### When translating into Chinese
@@ -112,11 +119,17 @@ A lower-priority rule may refine but never override a higher-priority requiremen
 - Use concise professional developer prose and established English technical terms. Do not transliterate Chinese engineering idioms literally.
 - Use the terminology table's English column exactly and do not carry Chinese first-occurrence glosses into English prose.
 
+#### When translating into Japanese
+- Use Japanese punctuation such as `、` and `。` in Japanese prose, while retaining half-width punctuation inside code spans, numbers, and complete verbatim English text.
+- Use natural Japanese spacing around Latin words and numerals without inserting spaces into identifiers, paths, commands, or version numbers. Keep half-width digits and Latin letters in machine-readable text.
+- Translate RFC 2119 keywords into Japanese terms with the same normative strength and preserve the source emphasis span; do not weaken `MUST`, `MUST NOT`, `SHOULD`, or `MAY`.
+
 ## Terminology
 
 A terminology table is provided below. Follow it strictly:
 - Render every listed term exactly as specified.
 - When the target language is Chinese, use the "中文" column. On the document's first prose occurrence, write the "首次出现" value when one is specified; on later occurrences, write only the part before the parenthetical gloss.
+- When the target language is Japanese, use the `日本語` column in the terminology table. Keep the listed Japanese rendering stable across the document and do not translate code or identifiers that resemble a listed term.
 - When the target language is English, use the "English" column without a Chinese gloss; do not copy the "中文" or "首次出现" value into English prose.
 - If a term has already been glossed as part of a compound term, do not gloss it again when it appears alone later.
 - NEVER use translations listed in the "不要译作" column.
@@ -252,10 +265,17 @@ Below are representative examples of common problems and their corrections. Foll
 - Bad: `# 全屏 TUI coding agent（需要 DEEPSEEK_API_KEY）`
 - Good: `# full-screen TUI coding agent (needs DEEPSEEK_API_KEY)` (keep exactly as-is, byte-for-byte)
 
+### Literal Japanese → Natural technical Japanese
+- Source: `Read the current session log before applying the update.`
+- Bad: `現在のセッションログを更新を適用する前に読んでください。`
+- Good: `更新を適用する前に、現在のセッションログを確認してください。`
+
 ### Language switcher — flip direction
 - Source file (English) has: `English | [中文](README.zh.md)`
 - Bad (copying source unchanged): `English | [中文](README.zh.md)`
 - Good (flipped for Chinese file): `[English](README.md) | 中文`
+- Japanese target: `[English](README.md) | [中文](README.zh.md) | 日本語`
+- Japanese source translated to English: `English | [中文](README.zh.md) | [日本語](README.ja.md)`
 
 ---
 

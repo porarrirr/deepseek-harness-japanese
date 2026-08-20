@@ -17,6 +17,9 @@ export const REPO_ROOT = fileURLToPath(new URL('../../..', import.meta.url))
  */
 export const ZH_BROWSER_LOCALE = 'zh-CN'
 
+/** Browser language that exercises the Japanese locale's provisional selection. */
+export const JA_BROWSER_LOCALE = 'ja-JP'
+
 /**
  * Open the standard browser-test page advertising English before client boot.
  * This keeps role locators and goldens deterministic while leaving the Host

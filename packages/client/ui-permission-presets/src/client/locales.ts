@@ -29,6 +29,19 @@ export const en = {
   'confirm.enable': 'Enable Full access',
 } satisfies Record<PermissionSettingsKey, string>
 
+/** Japanese dictionary, checked complete against the zh key set. */
+export const ja = {
+  'title': '権限',
+  'description': '新しいセッションのデフォルト権限モードを選択',
+  'loading': '読み込み中',
+  'unavailable': '利用できません',
+  'confirm.title': 'Full access を有効にしますか？',
+  'confirm.description': 'Full access を有効にすると、新しいセッションでは確認手順が減り、機密操作、ファイル変更、外部コマンドなど、より多くの操作を直接実行できます。後続のタスクを信頼できる場合にのみ使用してください。',
+  'confirm.acknowledge': 'リスクを理解し、続行します',
+  'confirm.cancel': 'キャンセル',
+  'confirm.enable': 'Full access を有効にする',
+} satisfies Record<PermissionSettingsKey, string>
+
 /** Simplified Chinese dictionary for the current-session popup gate. */
 export const accessZh = {
   'confirm.title': '确认启用 Full access？',
@@ -48,4 +61,13 @@ export const accessEn = {
   'confirm.acknowledge': 'I understand the risks and want to continue',
   'confirm.cancel': 'Cancel',
   'confirm.enable': 'Enable Full access',
+} satisfies Record<PermissionAccessKey, string>
+
+/** Japanese dictionary for the current-session popup gate. */
+export const accessJa = {
+  'confirm.title': 'Full access を有効にしますか？',
+  'confirm.description': 'Full access を有効にすると、エージェントは確認手順を減らし、機密操作、ファイル変更、外部コマンドなど、より多くの操作を直接実行できます。現在のタスクを信頼できる場合にのみ使用してください。',
+  'confirm.acknowledge': 'リスクを理解し、続行します',
+  'confirm.cancel': 'キャンセル',
+  'confirm.enable': 'Full access を有効にする',
 } satisfies Record<PermissionAccessKey, string>

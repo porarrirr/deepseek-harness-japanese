@@ -18,3 +18,11 @@ export const en = {
   'chip.off.aria': 'Plan mode off, press to turn on',
   'chip.off.title': 'Plan mode off — click to turn on (/plan)',
 } satisfies Record<PlanKey, string>
+
+/** Japanese dictionary, checked complete against the zh key set. */
+export const ja = {
+  'chip.on.aria': 'プランモードがオンです。押してオフにします',
+  'chip.on.title': 'プランモードがオン — クリックしてオフ（/plan off）',
+  'chip.off.aria': 'プランモードがオフです。押してオンにします',
+  'chip.off.title': 'プランモードがオフ — クリックしてオン（/plan）',
+} satisfies Record<PlanKey, string>

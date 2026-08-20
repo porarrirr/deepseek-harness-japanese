@@ -2,5 +2,6 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/spill.md
-spill.md: ad59e88b1f059d0127bdf48155450890b1bf7c9a
-spill.zh.md: 015ff6fc378c21e30f1cd84c985843f8c06cd44a
+spill.md: 0ef640826f0a02dd6135a374f400e117cf795bc2
+spill.zh.md: 14e3d9ad306c3a17de2b80e3b5e90571f5e42f7d
+spill.ja.md: 680fe3ef8942aa94dfc49bd411f3c053bb7186d8

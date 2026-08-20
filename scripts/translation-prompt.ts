@@ -16,22 +16,32 @@ export const TRANSLATION_PROMPT_PLACEHOLDERS = ['source_lang', 'target_lang', 't
 
 type TranslationPromptPlaceholder = (typeof TRANSLATION_PROMPT_PLACEHOLDERS)[number]
 
-/** Languages accepted by the bidirectional prompt. */
-type TranslationLanguage = 'English' | 'Chinese'
+/** Languages accepted by the translation prompt. */
+export type TranslationLanguage = 'English' | 'Chinese' | 'Japanese'
 
 /** Inputs that vary for one rendered translation request. */
 export interface TranslationPromptInput {
   sourceLanguage: TranslationLanguage
-  /** Source basename, including `.md` or `.zh.md`. */
+  /**
+   * Target language. Omitting it preserves the existing English↔Chinese
+   * default: English targets Chinese, and a translated source targets English.
+   */
+  targetLanguage?: TranslationLanguage
+  /** Source basename, including `.md`, `.zh.md`, or `.ja.md`. */
   sourceFilename: string
   /** Complete current `terminology.md` contents. */
   terminology: string
 }
 
-/** One reviewed whole-document example available in both directions. */
+/** One reviewed whole-document example with language-specific counterpart text. */
 export interface TranslationExample {
   english: string
   chinese: string
+  /**
+   * Japanese calibration text. Existing bilingual examples may omit it, but
+   * Japanese-direction requests reject an example without this content.
+   */
+  japanese?: string
 }
 
 /** Inputs for one complete model request. */
@@ -64,31 +74,92 @@ const TEMPLATE_OPEN = '## 模板正文\n\n````text\n'
 const TEMPLATE_CLOSE = '\n````'
 const RESPONSE_SECTIONS = ['translation', 'review', 'final'] as const
 const RESPONSE_DELIMITERS = new Set(RESPONSE_SECTIONS.flatMap(section => [`<${section}>`, `</${section}>`]))
-const LANGUAGE_SWITCHER = /^(?:English \| \[中文\]\(.+\)|\[English\]\(.+\) \| 中文)$/
+const LANGUAGE_SWITCHERS = [
+  /^English \| \[中文\]\([^)\n]+\)(?: \| \[日本語\]\([^)\n]+\))?$/,
+  /^\[English\]\([^)\n]+\) \| 中文(?: \| \[日本語\]\([^)\n]+\))?$/,
+  /^\[English\]\([^)\n]+\) \| \[中文\]\([^)\n]+\) \| 日本語$/,
+]
+
+function assertNever(value: never): never {
+  throw new Error(`translation prompt: unsupported language ${String(value)}`)
+}
 
 interface TranslationFiles {
+  targetLanguage: TranslationLanguage
   targetFilename: string
   targetSwitcher: string
 }
 
-function translationFiles(input: Pick<TranslationPromptInput, 'sourceFilename' | 'sourceLanguage'>): TranslationFiles {
-  if (basename(input.sourceFilename) !== input.sourceFilename) {
+function sourceLanguageOfFilename(sourceFilename: string): TranslationLanguage {
+  if (sourceFilename.endsWith('.zh.md')) return 'Chinese'
+  if (sourceFilename.endsWith('.ja.md')) return 'Japanese'
+  if (sourceFilename.endsWith('.md')) return 'English'
+  throw new Error(`translation prompt: sourceFilename must end in .md, .zh.md, or .ja.md; got ${JSON.stringify(sourceFilename)}`)
+}
+
+function translationFiles(
+  input: Pick<TranslationPromptInput, 'sourceFilename' | 'sourceLanguage' | 'targetLanguage'>,
+): TranslationFiles {
+  if (basename(input.sourceFilename) !== input.sourceFilename || input.sourceFilename.includes('\\')) {
     throw new Error(`translation prompt: sourceFilename must be a basename; got ${JSON.stringify(input.sourceFilename)}`)
   }
-  const sourceIsChinese = input.sourceFilename.endsWith('.zh.md')
-  const sourceIsEnglish = input.sourceFilename.endsWith('.md') && !sourceIsChinese
-  if (input.sourceLanguage === 'Chinese' ? !sourceIsChinese : !sourceIsEnglish) {
+  const sourceLanguage = sourceLanguageOfFilename(input.sourceFilename)
+  if (sourceLanguage !== input.sourceLanguage) {
     throw new Error(`translation prompt: ${input.sourceFilename} does not match source language ${input.sourceLanguage}`)
   }
-  if (sourceIsChinese) {
-    return {
-      targetFilename: input.sourceFilename.replace(/\.zh\.md$/, '.md'),
-      targetSwitcher: `English | [中文](${input.sourceFilename})`,
-    }
+  const targetLanguage = input.targetLanguage ?? (sourceLanguage === 'English' ? 'Chinese' : 'English')
+  if (
+    (sourceLanguage === 'English' && targetLanguage !== 'Chinese' && targetLanguage !== 'Japanese')
+    || (sourceLanguage !== 'English' && targetLanguage !== 'English')
+  ) {
+    throw new Error(`translation prompt: unsupported translation direction ${sourceLanguage} to ${targetLanguage}`)
   }
-  return {
-    targetFilename: input.sourceFilename.replace(/\.md$/, '.zh.md'),
-    targetSwitcher: `[English](${input.sourceFilename}) | 中文`,
+  const englishFilename = sourceLanguage === 'Chinese'
+    ? input.sourceFilename.replace(/\.zh\.md$/, '.md')
+    : sourceLanguage === 'Japanese'
+      ? input.sourceFilename.replace(/\.ja\.md$/, '.md')
+      : input.sourceFilename
+  const chineseFilename = englishFilename.replace(/\.md$/, '.zh.md')
+  const japaneseFilename = englishFilename.replace(/\.md$/, '.ja.md')
+  switch (targetLanguage) {
+    case 'Chinese':
+      return {
+        targetLanguage,
+        targetFilename: chineseFilename,
+        targetSwitcher: `[English](${englishFilename}) | 中文`,
+      }
+    case 'Japanese':
+      return {
+        targetLanguage,
+        targetFilename: japaneseFilename,
+        targetSwitcher: `[English](${englishFilename}) | [中文](${chineseFilename}) | 日本語`,
+      }
+    case 'English':
+      return {
+        targetLanguage,
+        targetFilename: englishFilename,
+        targetSwitcher: sourceLanguage === 'Japanese'
+          ? `English | [中文](${chineseFilename}) | [日本語](${japaneseFilename})`
+          : `English | [中文](${chineseFilename})`,
+      }
+    default:
+      return assertNever(targetLanguage)
+  }
+}
+
+function exampleContent(example: TranslationExample, language: TranslationLanguage): string {
+  switch (language) {
+    case 'English':
+      return example.english
+    case 'Chinese':
+      return example.chinese
+    case 'Japanese':
+      if (example.japanese === undefined) {
+        throw new Error('translation request: Japanese-direction examples require Japanese content')
+      }
+      return example.japanese
+    default:
+      return assertNever(language)
   }
 }
 
@@ -111,11 +182,10 @@ export function documentedTranslationPromptPlaceholders(document: string): strin
 
 /** Render one system prompt from the checked-in template. */
 export function renderTranslationPrompt(document: string, input: TranslationPromptInput): string {
-  translationFiles(input)
-  const targetLanguage: TranslationLanguage = input.sourceLanguage === 'English' ? 'Chinese' : 'English'
+  const files = translationFiles(input)
   const values: Record<TranslationPromptPlaceholder, string> = {
     source_lang: input.sourceLanguage,
-    target_lang: targetLanguage,
+    target_lang: files.targetLanguage,
     terminology: input.terminology,
   }
   const template = extractTranslationPrompt(document)
@@ -141,13 +211,11 @@ export function renderTranslationPrompt(document: string, input: TranslationProm
  */
 export function renderTranslationRequest(document: string, input: TranslationRequestInput): TranslationRequest {
   const files = translationFiles(input)
-  const sourceKey = input.sourceLanguage === 'English' ? 'english' : 'chinese'
-  const targetKey = input.sourceLanguage === 'English' ? 'chinese' : 'english'
   const messages: TranslationMessage[] = [{ role: 'system', content: renderTranslationPrompt(document, input) }]
   for (const example of input.examples) {
     messages.push(
-      { role: 'user', content: example[sourceKey] },
-      { role: 'assistant', content: example[targetKey] },
+      { role: 'user', content: exampleContent(example, input.sourceLanguage) },
+      { role: 'assistant', content: exampleContent(example, files.targetLanguage) },
     )
   }
   messages.push({ role: 'user', content: input.sourceDocument })
@@ -233,7 +301,7 @@ function correctLanguageSwitcher(markdown: string, switcher: string): string {
 
   let contentStart = headingIndex + 1
   while (lines[contentStart] === '') contentStart++
-  if (LANGUAGE_SWITCHER.test(lines[contentStart] ?? '')) contentStart++
+  if (LANGUAGE_SWITCHERS.some(pattern => pattern.test(lines[contentStart] ?? ''))) contentStart++
   while (lines[contentStart] === '') contentStart++
 
   const output = [...lines.slice(0, headingIndex), lines[headingIndex] as string, '', switcher]
@@ -251,7 +319,7 @@ function correctLanguageSwitcher(markdown: string, switcher: string): string {
  */
 export function consumeTranslationResponse(
   text: string,
-  input: Pick<TranslationPromptInput, 'sourceFilename' | 'sourceLanguage'>,
+  input: Pick<TranslationPromptInput, 'sourceFilename' | 'sourceLanguage' | 'targetLanguage'>,
 ): TranslationResponse {
   const parsed = parseTranslationResponse(text)
   const files = translationFiles(input)

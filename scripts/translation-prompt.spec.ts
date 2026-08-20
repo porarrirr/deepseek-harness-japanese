@@ -26,6 +26,7 @@ const retainedExamples = [
   ['### Slang/jargon → Professional phrasing', 'The committed agent workflow lives in .agents/skills/dsh-translate-docs', '仓库内置的 agent 工作流见 .agents/skills/dsh-translate-docs'],
   ['### "For humans" — translate the intent, not the word', 'For humans, start with the development guide', '面向开发者：请先阅读开发指南'],
   ['### Code block comments — NEVER translate', '# full-screen TUI coding agent (needs DEEPSEEK_API_KEY)', 'keep exactly as-is, byte-for-byte'],
+  ['### Literal Japanese → Natural technical Japanese', 'Read the current session log before applying the update.', '更新を適用する前に、現在のセッションログを確認してください。'],
   ['### Language switcher — flip direction', 'English | [中文](README.zh.md)', '[English](README.md) | 中文'],
 ]
 
@@ -42,6 +43,20 @@ describe('translation prompt rendering', () => {
     expect(en).toContain('The parser removes exactly one framing escape')
     const zh = renderTranslationPrompt(document, { sourceLanguage: 'Chinese', sourceFilename: 'guide.zh.md', terminology })
     expect(zh).toContain('from Chinese to English')
+    const ja = renderTranslationPrompt(document, {
+      sourceLanguage: 'English',
+      targetLanguage: 'Japanese',
+      sourceFilename: 'guide.md',
+      terminology,
+    })
+    expect(ja).toContain('from English to Japanese')
+    expect(ja).toContain('natural formal technical prose')
+    const jaSource = renderTranslationPrompt(document, {
+      sourceLanguage: 'Japanese',
+      sourceFilename: 'guide.ja.md',
+      terminology,
+    })
+    expect(jaSource).toContain('from Japanese to English')
   })
 
   it('contains every embedded example', () => {
@@ -85,7 +100,7 @@ describe('translation prompt rendering', () => {
       sourceFilename: 'guide.md',
       sourceDocument: '# Guide\n\nNew source.',
       terminology,
-      examples: [{ english: '# Example\n\nEnglish.', chinese: '# 示例\n\n中文。' }],
+      examples: [{ english: '# Example\n\nEnglish.', chinese: '# 示例\n\n中文。', japanese: '# 例\n\n日本語。' }],
     })
     expect(request.targetFilename).toBe('guide.zh.md')
     expect(request.messages.map(message => message.role)).toEqual(['system', 'user', 'assistant', 'user'])
@@ -100,7 +115,7 @@ describe('translation prompt rendering', () => {
       sourceFilename: 'guide.zh.md',
       sourceDocument: '# 指南\n\n新源文。',
       terminology,
-      examples: [{ english: '# Example\n\nEnglish.', chinese: '# 示例\n\n中文。' }],
+      examples: [{ english: '# Example\n\nEnglish.', chinese: '# 示例\n\n中文。', japanese: '# 例\n\n日本語。' }],
     })
     expect(reverse.targetFilename).toBe('guide.md')
     expect(reverse.messages.slice(1).map(message => message.content)).toEqual([
@@ -108,6 +123,28 @@ describe('translation prompt rendering', () => {
       '# Example\n\nEnglish.',
       '# 指南\n\n新源文。',
     ])
+
+    const japanese = renderTranslationRequest(document, {
+      sourceLanguage: 'Japanese',
+      sourceFilename: 'guide.ja.md',
+      sourceDocument: '# ガイド\n\n新しい原文。',
+      terminology,
+      examples: [{ english: '# Example\n\nEnglish.', chinese: '# 示例\n\n中文。', japanese: '# 例\n\n日本語。' }],
+    })
+    expect(japanese.targetFilename).toBe('guide.md')
+    expect(japanese.messages.slice(1).map(message => message.content)).toEqual([
+      '# 例\n\n日本語。',
+      '# Example\n\nEnglish.',
+      '# ガイド\n\n新しい原文。',
+    ])
+    expect(() => renderTranslationRequest(document, {
+      sourceLanguage: 'English',
+      targetLanguage: 'Japanese',
+      sourceFilename: 'guide.md',
+      sourceDocument: '# Guide',
+      terminology,
+      examples: [{ english: '# Example', chinese: '# 示例' }],
+    })).toThrow(/Japanese-direction examples require Japanese content/)
   })
 })
 
@@ -214,6 +251,23 @@ describe('translation response sections', () => {
       sourceFilename: 'guide.md',
       terminology,
     })).toThrow(/does not match source language Chinese/)
+    expect(() => renderTranslationPrompt(document, {
+      sourceLanguage: 'English',
+      targetLanguage: 'Japanese',
+      sourceFilename: 'guide.ja.md',
+      terminology,
+    })).toThrow(/does not match source language English/)
+    expect(() => renderTranslationPrompt(document, {
+      sourceLanguage: 'Japanese',
+      sourceFilename: 'guide.md',
+      terminology,
+    })).toThrow(/does not match source language Japanese/)
+    expect(() => renderTranslationPrompt(document, {
+      sourceLanguage: 'Chinese',
+      sourceFilename: 'guide.zh.md',
+      targetLanguage: 'Japanese',
+      terminology,
+    })).toThrow(/unsupported translation direction Chinese to Japanese/)
   })
 
   it('inserts the English target switcher for a Chinese source', () => {
@@ -226,5 +280,30 @@ describe('translation response sections', () => {
       sourceLanguage: 'Chinese',
       sourceFilename: 'guide.zh.md',
     }).final).toContain('\n\nEnglish | [中文](guide.zh.md)\n\n')
+  })
+
+  it('inserts the Japanese target switcher for an English source', () => {
+    const response = renderTranslationResponse({
+      translation: '# ガイド\n\n下書き。',
+      review: '- 無修正',
+      final: '# ガイド\n\nEnglish | [中文](guide.zh.md) | [日本語](guide.ja.md)\n\n最終稿。',
+    })
+    expect(consumeTranslationResponse(response, {
+      sourceLanguage: 'English',
+      targetLanguage: 'Japanese',
+      sourceFilename: 'guide.md',
+    }).final).toContain('\n\n[English](guide.md) | [中文](guide.zh.md) | 日本語\n\n')
+  })
+
+  it('inserts the trilingual English switcher for a Japanese source', () => {
+    const response = renderTranslationResponse({
+      translation: '# Guide\n\nDraft.',
+      review: '- No corrections.',
+      final: '# Guide\n\n[English](guide.md) | [中文](guide.zh.md) | 日本語\n\nFinal.',
+    })
+    expect(consumeTranslationResponse(response, {
+      sourceLanguage: 'Japanese',
+      sourceFilename: 'guide.ja.md',
+    }).final).toContain('\n\nEnglish | [中文](guide.zh.md) | [日本語](guide.ja.md)\n\n')
   })
 })

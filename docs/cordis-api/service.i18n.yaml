@@ -3,4 +3,5 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/cordis-api/service.md
 service.md: d4b0f06da16decf31e0d348a88e0360b46ee9d35
-service.zh.md: ec0b443a0eae2787e0a3db919583d8092414c52d
+service.zh.md: 7d06298f4e881a018b8b395c629edc7474010797
+service.ja.md: d9ff9cf315e587c4c2e75786fbc3a53332d6bc62

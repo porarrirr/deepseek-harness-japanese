@@ -2,13 +2,16 @@
  * Canonical publication manifest for the documentation website.
  *
  * Markdown stays in its owning repository tier. This manifest maps each
- * canonical source into matching route trees for both site locales; when a
- * translation is absent, both routes intentionally project the available
- * source instead of copying Markdown.
+ * canonical source into matching route trees for all site locales; an
+ * intentionally mirrored source is projected into every route without
+ * copying Markdown.
  */
 
 /** Locale key used by the VitePress site. */
-export type DocsLocale = 'root' | 'en'
+export type DocsLocale = 'root' | 'en' | 'ja'
+
+/** Site locales in route and navigation order. */
+export const DOCS_LOCALES = ['root', 'en', 'ja'] as const
 
 /** Sidebar collection rendered for one locale and top-level module. */
 export type DocsSidebar =
@@ -18,13 +21,16 @@ export type DocsSidebar =
   | 'en-guide'
   | 'en-develop'
   | 'en-reference'
+  | 'ja-guide'
+  | 'ja-develop'
+  | 'ja-reference'
 
 /** A page projected into the VitePress source tree. */
 export interface DocsPage {
   /** VitePress locale whose route tree owns this projection. */
   locale: DocsLocale
   /** Language of the canonical source currently projected at this route. */
-  contentLocale: 'zh-CN' | 'en-US'
+  contentLocale: 'zh-CN' | 'en-US' | 'ja-JP'
   /** Repository-relative canonical Markdown source. */
   source: string
   /** VitePress route, including the `.md` suffix. */
@@ -44,12 +50,12 @@ export interface DocsPage {
 }
 
 interface MirroredPage {
-  source: string | Record<DocsLocale, string>
+  source: string | Partial<Record<DocsLocale, string>>
   route: string
-  contentLocale: DocsPage['contentLocale'] | Record<DocsLocale, DocsPage['contentLocale']>
-  label: Record<DocsLocale, string>
-  sidebar: Record<DocsLocale, DocsSidebar | null>
-  section: Record<DocsLocale, string>
+  contentLocale: DocsPage['contentLocale'] | Partial<Record<DocsLocale, DocsPage['contentLocale']>>
+  label: string | Partial<Record<DocsLocale, string>>
+  sidebar: DocsSidebar | null | Partial<Record<DocsLocale, DocsSidebar | null>>
+  section: string | Partial<Record<DocsLocale, string>>
   order: number
   outline?: DocsPage['outline']
   sourceAliases?: string[] | Partial<Record<DocsLocale, string[]>>
@@ -62,14 +68,136 @@ type PairedPage = Omit<MirroredPage, 'source' | 'contentLocale' | 'sourceAliases
   sourceAliases?: string[]
 }
 
-function localized<T>(value: T | Record<DocsLocale, T>, locale: DocsLocale): T {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-    ? (value as Record<DocsLocale, T>)[locale]
-    : value
+const JAPANESE_LABELS: Readonly<Record<string, string>> = {
+  'DeepSeek Harness': 'DeepSeek Harness',
+  'Use the Web UI': 'Web UIを使う',
+  'Configure models': 'モデルを設定する',
+  'Your first Harness plugin': '最初のHarnessプラグイン',
+  'Build a tool': 'Toolを作る',
+  'Plugin configuration': 'プラグイン設定',
+  'Package and install': 'パッケージ化とインストール',
+  'Plugin lifecycle': 'プラグインのライフサイクル',
+  'Services and dependencies': 'サービスと依存関係',
+  'Event system': 'イベントシステム',
+  'Capability layering': 'Capabilityのレイヤー化',
+  'LLM adapter': 'LLMアダプター',
+  'Overview': '概要',
+  'Your first plugin': '最初のプラグイン',
+  'Lifecycle and effects': 'ライフサイクルとエフェクト',
+  'Services': 'サービス',
+  'Events': 'イベント',
+  'Configuration': '設定',
+  'Composition and HMR': '構成とHMR',
+  'Into the harness': 'Harnessの内部へ',
+  'Cordis primer': 'Cordis入門',
+  'Subsystems': 'サブシステム',
+  'Core': 'コア',
+  'Scopes': 'スコープ',
+  'Runtime invariants': 'ランタイム不変条件',
+  'Sessions': 'セッション',
+  'Session query': 'セッションクエリ',
+  'Session references': 'セッション参照',
+  'Session titles': 'セッションタイトル',
+  'Session projections': 'セッション投影',
+  'Session persistence': 'セッション永続化',
+  'Spill storage': 'Spillストレージ',
+  'SessionTelemetryBackend': 'SessionTelemetryBackend',
+  'LLM streaming': 'LLMストリーミング',
+  'Token metering': 'Token計測',
+  'System prompts': 'システムプロンプト',
+  'Compaction': 'コンパクション',
+  'Tools': 'Tool',
+  'Bash execution': 'Bash実行',
+  'Subprocesses': 'サブプロセス',
+  'PTY sessions': 'PTYセッション',
+  'Background jobs': 'バックグラウンドジョブ',
+  'Filesystem': 'ファイルシステム',
+  'LSP navigation': 'LSPナビゲーション',
+  'Code runtime': 'コードランタイム',
+  'Web access': 'Webアクセス',
+  'Skills': 'Skills',
+  'Workflows': 'Workflows',
+  'Subagents': 'Subagents',
+  'Approvals': '承認',
+  'Permission presets': '権限プリセット',
+  Sandboxing: 'サンドボックス',
+  'Plan mode': 'プランモード',
+  'User interaction': 'ユーザー操作',
+  'Human commands': 'ユーザーコマンド',
+  Goals: '目標',
+  'Scheduled reminders': 'スケジュール済みリマインダー',
+  'HTTP server': 'HTTPサーバー',
+  Typert: 'Typert',
+  'Client modules': 'クライアントモジュール',
+  Storage: 'ストレージ',
+  Workspaces: 'ワークスペース',
+  'User settings': 'ユーザー設定',
+  'User credentials': 'ユーザー認証情報',
+  Architecture: 'アーキテクチャ',
+  'Capability services': 'Capabilityサービス',
+  'Agent lifecycle': 'Agentライフサイクル',
+  'Tool execution': 'Tool実行',
+  'Tool schemas': 'Toolスキーマ',
+  'Persistence events': '永続化イベント',
+  Context: 'Context',
+  Fiber: 'Fiber',
+  'Plugin Registry': 'プラグインレジストリ',
+  Service: 'Service',
+  'Inherited surface': '継承されたAPI',
+  'Adding a package': 'パッケージを追加する',
+  'Adding a tool': 'Toolを追加する',
+  'Adding an LLM adapter': 'LLMアダプターを追加する',
+  'Adding a settings card': '設定カードを追加する',
+  'Extension patterns': '拡張パターン',
+  'Adding a Conversation Node': 'Conversation Nodeを追加する',
+}
+
+const JAPANESE_SECTIONS: Readonly<Record<string, string>> = {
+  Guide: 'ガイド',
+  SDK: 'SDK',
+  Basics: '基本',
+  Framework: 'フレームワーク',
+  Practice: '実践',
+  'Cordis framework tutorial': 'Cordisフレームワークチュートリアル',
+  Concepts: '概念',
+  'Generated reference': '生成リファレンス',
+  'Cordis Core API': 'Cordis Core API',
+  Cookbook: 'Cookbook',
+  Overview: '概要',
+  'Core and scopes': 'コアとスコープ',
+  'Sessions and persistence': 'セッションと永続化',
+  'Model and context': 'モデルとContext',
+  'Execution and tools': '実行とTool',
+  'Policy and interaction': 'ポリシーと操作',
+  'Platform and access': 'プラットフォームとアクセス',
+}
+
+function japaneseLabel(value: string): string {
+  return JAPANESE_LABELS[value] ?? value
+}
+
+function japaneseSection(value: string): string {
+  return JAPANESE_SECTIONS[value] ?? value
+}
+
+function japaneseSidebar(value: DocsSidebar | null): DocsSidebar | null {
+  if (value === null) return null
+  if (value === 'en-guide') return 'ja-guide'
+  if (value === 'en-develop') return 'ja-develop'
+  if (value === 'en-reference') return 'ja-reference'
+  return value
+}
+
+function localized<T>(value: T | Partial<Record<DocsLocale, T>>, locale: DocsLocale): T {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return value
+  const values = value as Partial<Record<DocsLocale, T>>
+  const selected = values[locale] ?? values.en ?? values.root
+  if (selected === undefined) throw new Error(`Documentation manifest has no value for locale "${locale}".`)
+  return selected
 }
 
 function mirroredPages(pages: MirroredPage[]): DocsPage[] {
-  return pages.flatMap(page => (['root', 'en'] as const).map((locale) => {
+  return pages.flatMap(page => DOCS_LOCALES.map((locale) => {
     const aliases = page.sourceAliases === undefined
       ? undefined
       : Array.isArray(page.sourceAliases) ? page.sourceAliases : page.sourceAliases[locale]
@@ -77,10 +205,10 @@ function mirroredPages(pages: MirroredPage[]): DocsPage[] {
       locale,
       contentLocale: localized(page.contentLocale, locale),
       source: localized(page.source, locale),
-      route: locale === 'root' ? page.route : `en/${page.route}`,
-      label: page.label[locale],
-      sidebar: page.sidebar[locale],
-      section: page.section[locale],
+      route: locale === 'root' ? page.route : `${locale}/${page.route}`,
+      label: locale === 'ja' ? japaneseLabel(localized(page.label, locale)) : localized(page.label, locale),
+      sidebar: locale === 'ja' ? japaneseSidebar(localized(page.sidebar, locale)) : localized(page.sidebar, locale),
+      section: locale === 'ja' ? japaneseSection(localized(page.section, locale)) : localized(page.section, locale),
       order: page.order,
       ...(page.outline === undefined ? {} : { outline: page.outline }),
       ...(aliases === undefined ? {} : { sourceAliases: aliases }),
@@ -91,14 +219,16 @@ function mirroredPages(pages: MirroredPage[]): DocsPage[] {
 function pairedPages(pages: PairedPage[]): DocsPage[] {
   return mirroredPages(pages.map((page) => {
     const chineseSource = page.source.replace(/\.md$/, '.zh.md')
+    const japaneseSource = page.source.replace(/\.md$/, '.ja.md')
     const sharedAliases = page.sourceAliases ?? []
     return {
       ...page,
-      source: { root: chineseSource, en: page.source },
-      contentLocale: { root: 'zh-CN', en: 'en-US' },
+      source: { root: chineseSource, en: page.source, ja: japaneseSource },
+      contentLocale: { root: 'zh-CN', en: 'en-US', ja: 'ja-JP' },
       sourceAliases: {
-        root: [...sharedAliases, page.source],
-        en: [...sharedAliases, chineseSource],
+        root: [...sharedAliases, page.source, japaneseSource],
+        en: [...sharedAliases, chineseSource, japaneseSource],
+        ja: [...sharedAliases, page.source, chineseSource],
       },
     }
   }))
@@ -450,6 +580,18 @@ const sections: Record<DocsLocale, readonly DocsSection[]> = {
     { label: 'Execution and tools', collapsed: true },
     { label: 'Policy and interaction', collapsed: true },
     { label: 'Platform and access', collapsed: true },
+  ],
+  ja: [
+    { label: 'ガイド' }, { label: 'SDK' },
+    { label: '基本' }, { label: 'フレームワーク' }, { label: '実践' }, { label: 'Cordisフレームワークチュートリアル' },
+    { label: '概念' }, { label: '生成リファレンス' }, { label: 'Cordis Core API' }, { label: 'Cookbook' },
+    { label: '概要' },
+    { label: 'コアとスコープ', collapsed: true },
+    { label: 'セッションと永続化', collapsed: true },
+    { label: 'モデルとContext', collapsed: true },
+    { label: '実行とTool', collapsed: true },
+    { label: 'ポリシーと操作', collapsed: true },
+    { label: 'プラットフォームとアクセス', collapsed: true },
   ],
 }
 

@@ -21,9 +21,9 @@ import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import {
   LOCALE_PREFERENCE_FIELD, LOCALE_SETTINGS_NAMESPACE, type LocaleId, type LocaleSettings,
 } from '../locale-settings.ts'
-import { en, zh, type CommonKey } from '../locales/index.ts'
+import { en, ja, zh, type CommonKey } from '../locales/index.ts'
 import {
-  en as settingsEn, zh as settingsZh, type SettingsLocaleKey,
+  en as settingsEn, ja as settingsJa, zh as settingsZh, type SettingsLocaleKey,
 } from '../locales/settings.ts'
 import type { LanguageRowInjected } from './LanguageRow.tsx'
 import { LanguageRow } from './LanguageRow.tsx'
@@ -55,7 +55,7 @@ export type LocaleDict = Record<string, string>
 export interface LocaleDefinition {
   /** Locale id (persisted; the setLocale argument). */
   id: LocaleId
-  /** Display name in its own language (中文 / English). */
+  /** Display name in its own language (中文 / English / 日本語). */
   label: string
 }
 
@@ -90,10 +90,10 @@ declare module '@deepseek-ai/cordis' {
  * English is both the locale the UI opens in when the browser names no shipped
  * language (and for non-browser runs), and the dictionary consulted after the
  * active locale misses a key. One constant serves both because the shipped
- * `zh`/`en` dictionaries carry identical key sets, so neither direction can
+ * `zh`/`en`/`ja` dictionaries carry identical key sets, so no locale direction can
  * leave a key unresolved; the residual case points at English rather than
- * zh because a browser naming neither shipped language is the reader least
- * likely to read Chinese.
+ * zh or ja because a browser naming none of the shipped languages is the reader
+ * least likely to read Chinese or Japanese.
  */
 export const FALLBACK_LOCALE: LocaleId = 'en'
 
@@ -103,10 +103,11 @@ export const COMMON_NS = 'common'
 /** Namespace owning this feature's settings-row copy. */
 export const SETTINGS_NS = 'settings.locale'
 
-/** The two shipped locales. */
+/** The three shipped locales. */
 const LOCALES: readonly LocaleDefinition[] = Object.freeze([
   { id: 'zh', label: '中文' },
   { id: 'en', label: 'English' },
+  { id: 'ja', label: '日本語' },
 ])
 
 /**
@@ -117,7 +118,7 @@ const LOCALES: readonly LocaleDefinition[] = Object.freeze([
  * behavior. `zh` alone leaves the script ambiguous, so the shipped Chinese
  * copy names the variant it actually is.
  */
-const DOCUMENT_LANGUAGE: Record<LocaleId, string> = { zh: 'zh-CN', en: 'en' }
+const DOCUMENT_LANGUAGE: Record<LocaleId, string> = { zh: 'zh-CN', en: 'en', ja: 'ja' }
 
 /**
  * Point `<html lang>` at the active locale. Called on every locale change,
@@ -232,8 +233,8 @@ export class LocaleRuntime {
   /**
    * Register a declared namespace's dictionaries, all locales in one call —
    * the typed form: each dictionary is checked against the namespace's
-   * {@link LocaleNamespaceMap} key union (a missing or extra key is a
-   * compile error), and every shipped locale is required (bilingual balance
+ * {@link LocaleNamespaceMap} key union (a missing or extra key is a
+ * compile error), and every shipped locale is required (locale balance
    * enforced at registration). Duplicate (ns, locale) throws (single occupant; a
    * namespace's texts have one owner). Registration bumps the revision so
    * mounted outlets pick up late-arriving dictionaries.
@@ -360,7 +361,7 @@ function resolveInitialLocale(): LocaleId {
 /**
  * The first shipped locale the browser asks for, matched on the primary
  * subtag so every regional variant lands on its language (`zh-Hans-CN` -> zh,
- * `en-GB` -> en). `window` is the browser test, not `navigator`: Node exposes
+ * `en-GB` -> en, `ja-JP` -> ja). `window` is the browser test, not `navigator`: Node exposes
  * a global `navigator` reporting the machine's own language, which would
  * otherwise decide the locale for non-browser runs (node e2e booting the
  * client tree). `navigator.language` trails the ordered `languages` list and
@@ -392,8 +393,8 @@ export const inject = ['slots', 'connection', 'remote', 'settingsScope']
 export function apply(ctx: ClientContext): void {
   const host = ctx.settingsScope.bind<LocaleSettings>({ namespace: LOCALE_SETTINGS_NAMESPACE })
   const locale = new LocaleRuntime(ctx, host)
-  locale.register(COMMON_NS, { zh, en })
-  locale.register(SETTINGS_NS, { zh: settingsZh, en: settingsEn })
+  locale.register(COMMON_NS, { zh, en, ja })
+  locale.register(SETTINGS_NS, { zh: settingsZh, en: settingsEn, ja: settingsJa })
   ctx.provide('locale', locale)
   // The service IS the LocaleFace (bind + getSnapshot/subscribe): install it
   // so the render machinery can synthesize the `t` standard seat.

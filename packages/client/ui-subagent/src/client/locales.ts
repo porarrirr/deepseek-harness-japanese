@@ -77,5 +77,42 @@ export const en: Record<SubagentKey, string> = {
   'readonly.body': 'The parent session is offline; reopen it to continue sending messages.',
 }
 
+/** Japanese dictionary, key-identical to the Chinese source of truth. */
+export const ja: Record<SubagentKey, string> = {
+  'diagnostic.corrupt': '破損したセッション記録',
+  'diagnostic.unsupported': 'サブエージェント記録のバージョンに対応していません',
+  'diagnostic.unavailable': 'セッション記録を一時的に利用できません',
+  'duration.seconds': '{seconds}秒',
+  'duration.minutes': '{minutes}分 {seconds}秒',
+  'duration.hours': '{hours}時間 {minutes}分 {seconds}秒',
+  'duration.days': '{days}日',
+  'duration.daysHours': '{days}日 {hours}時間',
+  'duration.months': '約 {months}か月',
+  'duration.monthsDays': '約 {months}か月 {days}日',
+  'duration.years': '約 {years}年',
+  'duration.yearsMonths': '約 {years}年 {months}か月',
+  'duration.exactDays': '{days}日 {hours}時間 {minutes}分 {seconds}秒',
+  'duration.exactTitle': '合計アクティブ時間：{duration}',
+  'loading.label': 'サブエージェントを読み込み中…',
+  'loading.aria': 'サブエージェントを読み込み中',
+  'load.error': 'サブエージェントを読み込めません',
+  'retry': '再試行',
+  'mode.oneShot': 'ワンショット',
+  'mode.continuable': '継続可能',
+  'activity.running': '実行中',
+  'activity.inactive': '実行していません',
+  'branch.collapse': '{label} の子サブエージェントを折りたたむ',
+  'branch.expand': '{label} の子サブエージェントを展開',
+  'count.total.one': '{count} 件のサブエージェント',
+  'count.total.other': '{count} 件のサブエージェント',
+  'count.running.one': '{count} 件のサブエージェントが実行中',
+  'count.running.other': '{count} 件のサブエージェントが実行中',
+  'tree.aria': 'サブエージェントのセッション',
+  'readonly.oneShot.title': 'ワンショットサブエージェントの記録',
+  'readonly.title': 'このサブエージェントは現在読み取り専用です',
+  'readonly.oneShot.body': 'ワンショットタスクには追加のメッセージを送れません。ここで実行記録全体を確認できます。',
+  'readonly.body': '親セッションがオフラインです。再度開くとメッセージを送信できます。',
+}
+
 /** Key domain of the `subagent` namespace (zh is the source of truth). */
 export type SubagentKey = keyof typeof zh

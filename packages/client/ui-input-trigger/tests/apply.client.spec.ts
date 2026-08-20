@@ -11,6 +11,7 @@ import { createScope, scopeOf, SlotRegistry } from '@deepseek-ai/dsh-client-runt
 import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import { apply, inject, InputTriggerService } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 import type { MenuViewInjected } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
+import { ja } from '../src/client/locales.ts'
 
 const sid = (k: string): SessionId => k as SessionId
 
@@ -45,7 +46,7 @@ describe('apply', () => {
     expect(inject).toEqual(['sessions', 'locale'])
   })
 
-  it('registers the bilingual menu dictionaries (group titles by source name + the pending row)', async () => {
+  it('registers the three-language menu dictionaries (group titles by source name + the pending row)', async () => {
     const { ctx, locale } = await bench()
     await ctx.plugin({ inject: [...inject], apply }).await()
     const t = locale.bind('slash.menu')
@@ -54,6 +55,8 @@ describe('apply', () => {
     expect(t('skill')).toBe('Skills')
     expect(t('subagent')).toBe('Subagents')
     expect(t('loading')).toBe('Loading…')
+    locale.setLocale('ja')
+    expect(t('command')).toBe(ja.command)
   })
 
   it('mounts ctx.inputTriggers once sessions is up, before any conversation service exists', async () => {

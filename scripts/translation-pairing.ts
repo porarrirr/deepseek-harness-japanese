@@ -1,5 +1,5 @@
 /**
- * Pure parsing and structural helpers for the bilingual-document pairing
+ * Pure parsing and structural helpers for the documentation pairing
  * gate. Kept separate from the CLI so corpus discovery and signature behavior
  * can be regression-tested without reading or mutating the repository tree.
  * Also the one home of the generated-region grammar and the pair-record
@@ -12,6 +12,8 @@ import { fromMarkdown } from 'mdast-util-from-markdown'
 import { gfmFromMarkdown } from 'mdast-util-gfm'
 import { gfm } from 'micromark-extension-gfm'
 import type { Nodes } from 'mdast'
+import { docsPages } from '../website/docs.ts'
+import type { TranslationPairingMode } from './translation-pairing-record.ts'
 
 /** Complete opening marker line: `<!-- BEGIN GENERATED <slug> … -->` (slug captured). */
 const GENERATED_REGION_BEGIN_LINE = /^<!-- BEGIN GENERATED (\S+)(?: [^>]*)? -->$/
@@ -81,8 +83,8 @@ const PAIR_META_LINE = /^([^:#]+\.md): ([0-9a-f]{40})$/
  * Parse a `foo.i18n.yaml` consistency record into basename → recorded blob
  * hash, or undefined when any non-comment line deviates from the exact
  * `<basename>.md: <40-hex>` format or repeats a key. Consumers must
- * additionally require exactly the two expected basenames — a renamed key is
- * a malformed record, never a silently-missing entry.
+ * additionally require exactly the expected basenames for the document's
+ * language set — a renamed key is malformed, never silently missing.
  * @param content - Sidecar file text.
  * @returns The recorded map, or undefined for a malformed record.
  */
@@ -104,9 +106,21 @@ export function parsePairMeta(content: string): Map<string, string> | undefined 
  * @param sourceHash - Blob hash of the English side.
  * @param zh - Repo-relative Chinese path.
  * @param zhHash - Blob hash of the Chinese side.
+ * @param ja - Optional repo-relative Japanese path.
+ * @param jaHash - Blob hash of the Japanese side when `ja` is provided.
  * @returns The exact sidecar file content.
  */
-export function renderPairMeta(source: string, sourceHash: string, zh: string, zhHash: string): string {
+export function renderPairMeta(
+  source: string,
+  sourceHash: string,
+  zh: string,
+  zhHash: string,
+  ja?: string,
+  jaHash?: string,
+): string {
+  if ((ja === undefined) !== (jaHash === undefined)) {
+    throw new Error('translation pairing metadata requires both the Japanese path and hash')
+  }
   return [
     '# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each',
     '# side as of the last confirmed-consistent state. Both languages carry equal authority;',
@@ -114,6 +128,7 @@ export function renderPairMeta(source: string, sourceHash: string, zh: string, z
     `#   pnpm run verify-translation-pairing --write ${source}`,
     `${basename(source)}: ${sourceHash}`,
     `${basename(zh)}: ${zhHash}`,
+    ...(ja === undefined || jaHash === undefined ? [] : [`${basename(ja)}: ${jaHash}`]),
     '',
   ].join('\n')
 }
@@ -124,9 +139,9 @@ export interface TranslationPairingManifest {
   excluded: string[]
 }
 
-const README_ARTIFACT = /(?:^|\/)readme(?:\.md|\.zh\.md|\.i18n\.yaml)$/i
-const ROOT_CONTRIBUTING_ARTIFACT = /^contributing(?:\.md|\.zh\.md|\.i18n\.yaml)$/i
-const ROOT_BRAND_GUIDELINES_ARTIFACT = /^brand_guidelines(?:\.md|\.zh\.md|\.i18n\.yaml)$/i
+const README_ARTIFACT = /(?:^|\/)readme(?:\.md|\.zh\.md|\.ja\.md|\.i18n\.yaml)$/i
+const ROOT_CONTRIBUTING_ARTIFACT = /^contributing(?:\.md|\.zh\.md|\.ja\.md|\.i18n\.yaml)$/i
+const ROOT_BRAND_GUIDELINES_ARTIFACT = /^brand_guidelines(?:\.md|\.zh\.md|\.ja\.md|\.i18n\.yaml)$/i
 const NON_SOURCE_DIRECTORIES = new Set([
   'node_modules',
   'lib',
@@ -188,6 +203,45 @@ export function isTranslationScopeFile(file: string): boolean {
     || file.startsWith('python/'))
 }
 
+/** Normalize one Markdown language side to its unsuffixed English anchor. */
+function translationSourceAnchor(file: string): string | undefined {
+  const normalized = file.split('\\').join('/')
+  if (normalized.endsWith('.zh.md')) return `${normalized.slice(0, -'.zh.md'.length)}.md`
+  if (normalized.endsWith('.ja.md')) return `${normalized.slice(0, -'.ja.md'.length)}.md`
+  if (normalized.endsWith('.md')) return normalized
+  return undefined
+}
+
+const PUBLIC_TRANSLATION_SOURCES = new Set(
+  docsPages
+    .map(page => translationSourceAnchor(page.source))
+    .filter((source): source is string => source !== undefined),
+)
+
+/**
+ * Return the unsuffixed Markdown sources published by the documentation site.
+ *
+ * The publication manifest is the only source of this set. Locale entries are
+ * normalized to one English anchor and deduplicated, so adding a page to
+ * `website/docs.ts` automatically changes its pairing language set.
+ *
+ * @returns Sorted repository-relative English anchors for published pages.
+ */
+export function publicTranslationSources(): string[] {
+  return [...PUBLIC_TRANSLATION_SOURCES].sort()
+}
+
+/**
+ * Whether a repository-relative Markdown path belongs to the published site.
+ *
+ * @param file - English, Chinese, or Japanese repository-relative path.
+ * @returns `true` when its English anchor is present in `website/docs.ts`.
+ */
+export function isPublicTranslationSource(file: string): boolean {
+  const source = translationSourceAnchor(file)
+  return source !== undefined && PUBLIC_TRANSLATION_SOURCES.has(source)
+}
+
 /** Read the manifest exclusion list or fail before enforcement starts. */
 function excludedField(record: Record<string, unknown>): string[] {
   const value = record.excluded
@@ -217,7 +271,7 @@ export function parseTranslationPairingManifest(content: string): TranslationPai
 
 /**
  * Normalize one CLI pair argument to its English anchor path: any of the
- * pair's three files (`foo.md`, `foo.zh.md`, `foo.i18n.yaml`) or the bare
+ * pair's four files (`foo.md`, `foo.zh.md`, `foo.ja.md`, `foo.i18n.yaml`) or the bare
  * `foo` stem names the same pair, and platform separators are accepted.
  *
  * @param argument - Repo-relative path as passed on a command line.
@@ -226,6 +280,7 @@ export function parseTranslationPairingManifest(content: string): TranslationPai
 export function pairAnchorOfArgument(argument: string): string {
   const normalized = argument.split('\\').join('/').replace(/^\.\//, '')
   if (normalized.endsWith('.zh.md')) return `${normalized.slice(0, -'.zh.md'.length)}.md`
+  if (normalized.endsWith('.ja.md')) return `${normalized.slice(0, -'.ja.md'.length)}.md`
   if (normalized.endsWith('.i18n.yaml')) return `${normalized.slice(0, -'.i18n.yaml'.length)}.md`
   if (normalized.endsWith('.md')) return normalized
   return `${normalized}.md`
@@ -311,6 +366,43 @@ export function languageSwitcherTargets(counterpart: string): string[] {
   return [basename(counterpart), `${PUBLIC_REPOSITORY_BLOB_ROOT}${counterpart}`]
 }
 
+/** A document language used to render an exact language-switcher line. */
+export type TranslationDocumentLanguage = 'en' | 'zh' | 'ja'
+
+/**
+ * Render the exact language-switcher line required for one pair side.
+ *
+ * @param language - Language of the document carrying the line.
+ * @param source - Any path belonging to the pair.
+ * @param mode - Pair language set.
+ * @returns The canonical Markdown switcher line.
+ * @throws When a Japanese line is requested for a bilingual pair.
+ */
+export function languageSwitcherLine(
+  language: TranslationDocumentLanguage,
+  source: string,
+  mode: TranslationPairingMode,
+): string {
+  const anchor = pairAnchorOfArgument(source)
+  const zh = `${anchor.slice(0, -'.md'.length)}.zh.md`
+  const ja = `${anchor.slice(0, -'.md'.length)}.ja.md`
+  if (mode === 'trilingual') {
+    switch (language) {
+      case 'en':
+        return `English | [中文](${basename(zh)}) | [日本語](${basename(ja)})`
+      case 'zh':
+        return `[English](${basename(anchor)}) | 中文 | [日本語](${basename(ja)})`
+      case 'ja':
+        return `[English](${basename(anchor)}) | [中文](${basename(zh)}) | 日本語`
+      default:
+        language satisfies never
+    }
+  }
+  if (language === 'en') return `English | [中文](${basename(zh)})`
+  if (language === 'zh') return `[English](${basename(anchor)}) | 中文`
+  throw new Error('Japanese language switchers require a trilingual pairing record')
+}
+
 /** Whether the tree contains a link to any accepted target. */
 export function linksTo(tree: Nodes, targets: string | readonly string[]): boolean {
   const accepted = new Set(typeof targets === 'string' ? [targets] : targets)
@@ -321,6 +413,35 @@ export function linksTo(tree: Nodes, targets: string | readonly string[]): boole
   }
   visit(tree)
   return found
+}
+
+/**
+ * Check one side's language switcher while preserving the canonical URL form
+ * used by non-public README files.
+ *
+ * @param tree - Parsed Markdown tree for the owner.
+ * @param content - Exact Markdown text for line-level canonical checks.
+ * @param language - Language of the owner being checked.
+ * @param source - Unsuffixed English anchor of the pair.
+ * @param mode - Bilingual or public trilingual language set.
+ * @param counterpart - Repository path of the required backlink.
+ * @returns Whether the required switcher is present.
+ */
+export function hasLanguageSwitcher(
+  tree: Nodes,
+  content: string,
+  language: TranslationDocumentLanguage,
+  source: string,
+  mode: TranslationPairingMode,
+  counterpart: string,
+): boolean {
+  const expected = languageSwitcherLine(language, source, mode)
+  if (content.split('\n').includes(expected)) return true
+  // README files outside the public site may use the documented canonical
+  // GitHub URL, which is equivalent to the relative target for a reader.
+  return mode === 'bilingual' && !isPublicTranslationSource(source)
+    ? linksTo(tree, languageSwitcherTargets(counterpart))
+    : false
 }
 
 /** Generated English sources cannot carry a switcher without making their generator stale. */

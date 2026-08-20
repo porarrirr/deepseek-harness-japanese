@@ -52,3 +52,24 @@ export const en = {
   'blocked.composer': 'This model is unavailable — select one to continue',
   'empty.efforts': 'This model provides no reasoning effort levels.',
 } satisfies Record<ModelKey, string>
+
+/** Japanese dictionary, checked complete against the zh key set. */
+export const ja = {
+  'command.description': 'この会話で使用するモデルを選択',
+  'option.loadError': 'カタログの読み込みに失敗しました：{message}',
+  'trigger.fallback': 'モデルを選択',
+  'trigger.selectAria': 'モデルを選択',
+  'trigger.aria': 'モデルを選択、現在は {model}',
+  'trigger.ariaEffort': 'モデルを選択、現在は {model}、推論レベル {effort}',
+  'menu.aria': 'モデルと推論レベル',
+  'menu.model': 'モデル',
+  'menu.effort': '推論レベル',
+  'effort.providerDefault': 'デフォルト',
+  'status.loading': 'モデル一覧を更新中…',
+  'error.action': 'モデルの操作に失敗しました：{message}',
+  'action.reload': '再読み込み',
+  'warning.groupLoad': '{name} の読み込みに失敗しました：{message}',
+  'empty.models': '利用できるモデルがありません。',
+  'blocked.composer': '現在のモデルは利用できません。先にモデルを選択してください',
+  'empty.efforts': '現在のモデルには推論レベルがありません。',
+} satisfies Record<ModelKey, string>

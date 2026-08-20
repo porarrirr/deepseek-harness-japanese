@@ -1,6 +1,6 @@
 # Get started with the Python SDK
 
-English | [中文](python-sdk.zh.md)
+English | [中文](python-sdk.zh.md) | [日本語](python-sdk.ja.md)
 
 This tutorial is the programmatic alternative to the Web UI. It installs the published Python SDK, runs a checked-in agent composition, and shows how to call the same API from your own program.
 

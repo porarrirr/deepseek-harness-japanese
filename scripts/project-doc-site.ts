@@ -181,10 +181,24 @@ function sourceMap(pages: DocsPage[]): Map<string, Map<DocsLocale, DocsPage>> {
   return map
 }
 
-function counterpartSource(source: string): string {
-  return source.endsWith('.zh.md')
-    ? source.replace(/\.zh\.md$/, '.md')
-    : source.replace(/\.md$/, '.zh.md')
+function translationVariant(source: string): DocsLocale | undefined {
+  if (source.endsWith('.zh.md')) return 'root'
+  if (source.endsWith('.ja.md')) return 'ja'
+  if (source.endsWith('.md')) return 'en'
+  return undefined
+}
+
+function translationStem(source: string): string {
+  return source.replace(/(?:\.zh|\.ja)?\.md$/, '.md')
+}
+
+function isLanguageSwitcher(source: string, target: string): boolean {
+  const sourceLocale = translationVariant(source)
+  const targetLocale = translationVariant(target)
+  return sourceLocale !== undefined
+    && targetLocale !== undefined
+    && sourceLocale !== targetLocale
+    && translationStem(source) === translationStem(target)
 }
 
 function resolveRepositoryTarget(sourceAbs: string, rawPath: string, repoRoot: string): { absPath: string; line?: number } {
@@ -244,9 +258,9 @@ export function rewriteMarkdown(source: string, options: RewriteMarkdownOptions)
     if (path === '') return
     const { absPath, line } = resolveRepositoryTarget(sourceAbs, path, options.repoRoot)
     const targetPath = repoPath(absPath, options.repoRoot)
-    const isLanguageSwitcher = targetPath === counterpartSource(options.sourcePath)
-    const targetLocale: DocsLocale = isLanguageSwitcher
-      ? options.locale === 'root' ? 'en' : 'root'
+    const switcher = isLanguageSwitcher(options.sourcePath, targetPath)
+    const targetLocale: DocsLocale = switcher
+      ? translationVariant(targetPath) as DocsLocale
       : options.locale
     const page = published.get(targetPath)?.get(targetLocale)
     const nextUrl = page !== undefined
@@ -303,7 +317,11 @@ export function addProjectionFrontmatter(markdown: string, page: Pick<DocsPage, 
 }
 
 /** The switcher line a canonical page carries so its GitHub reader can reach the other language. */
-const LANGUAGE_SWITCHER = /^(?:English \| \[中文\]\([^)]*\)|\[English\]\([^)]*\) \| 中文)$/
+const LANGUAGE_SWITCHERS = [
+  /^English \| \[中文\]\([^)]*\)(?: \| \[日本語\]\([^)]*\))?$/,
+  /^\[English\]\([^)]*\) \| 中文(?: \| \[日本語\]\([^)]*\))?$/,
+  /^\[English\]\([^)]*\) \| \[中文\]\([^)]*\) \| 日本語$/,
+]
 
 /** The repository badge a canonical page carries for its GitHub reader. */
 const REPOSITORY_BADGE = /^\[!\[[^\]]*\]\(https:\/\/img\.shields\.io\/[^)]*\)\]\([^)]*\)$/
@@ -320,7 +338,7 @@ const REPOSITORY_BADGE = /^\[!\[[^\]]*\]\(https:\/\/img\.shields\.io\/[^)]*\)\]\
  */
 function withoutRepositoryChrome(markdown: string): string {
   const lines = markdown.split('\n')
-  const switcher = lines.findIndex(line => LANGUAGE_SWITCHER.test(line))
+  const switcher = lines.findIndex(line => LANGUAGE_SWITCHERS.some(pattern => pattern.test(line)))
   // Only the switcher introducing the page qualifies; further down the same
   // text is prose or a sample rather than the page's own header.
   if (switcher !== -1 && switcher < 8) {
@@ -331,6 +349,90 @@ function withoutRepositoryChrome(markdown: string): string {
     lines.splice(lines[badge - 1] === '' ? badge - 1 : badge, lines[badge - 1] === '' ? 2 : 1)
   }
   return lines.join('\n')
+}
+
+function decodeFragment(fragment: string): string {
+  try {
+    return decodeURIComponent(fragment)
+  } catch (error) {
+    if (!(error instanceof URIError)) throw error
+    return fragment
+  }
+}
+
+function escapeHtmlAttribute(value: string): string {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('"', '&quot;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+}
+
+/**
+ * Collect source fragment ids that Japanese route pages must retain as aliases.
+ *
+ * Cross-page Markdown links keep the canonical English fragment so the
+ * translation pairing gate can compare their destinations. A translated
+ * heading has a different VitePress-generated id, so the projection adds a
+ * zero-size anchor for every published fragment that points at its Japanese
+ * sibling.
+ *
+ * @param pages - Complete publication manifest.
+ * @returns Japanese source paths and their canonical fragment aliases.
+ */
+function fragmentAliasesFor(pages: DocsPage[]): Map<string, Set<string>> {
+  const japaneseByStem = new Map<string, string>()
+  for (const page of pages) {
+    if (page.locale === 'ja') japaneseByStem.set(translationStem(page.source), page.source)
+  }
+  const aliases = new Map<string, Set<string>>()
+  const sourcePaths = new Set(pages.map(page => page.source))
+  for (const sourcePath of sourcePaths) {
+    const sourceAbs = resolve(root, sourcePath)
+    if (!existsSync(sourceAbs)) continue
+    const tree = fromMarkdown(readFileSync(sourceAbs, 'utf8'), {
+      extensions: [gfm()],
+      mdastExtensions: [gfmFromMarkdown()],
+    })
+    const visit = (node: Nodes): void => {
+      if ((node.type === 'link' || node.type === 'definition') && node.url.includes('#')) {
+        const { path, suffix } = splitTarget(node.url)
+        if (path !== '' && isExternalOrSiteAbsolute(path)) {
+          // Absolute and external links cannot target a projected sibling.
+        } else if (suffix.startsWith('#')) {
+          const targetPath = path === ''
+            ? sourcePath
+            : repoPath(resolveRepositoryTarget(sourceAbs, path, root).absPath, root)
+          const japaneseSource = japaneseByStem.get(translationStem(targetPath))
+          const fragment = decodeFragment(suffix.slice(1))
+          if (japaneseSource !== undefined && fragment !== '') {
+            const targetAliases = aliases.get(japaneseSource) ?? new Set<string>()
+            targetAliases.add(fragment)
+            aliases.set(japaneseSource, targetAliases)
+          }
+        }
+      }
+      if ('children' in node) {
+        for (const child of node.children) visit(child)
+      }
+    }
+    visit(tree)
+  }
+  return aliases
+}
+
+function addFragmentAliases(markdown: string, aliases: Set<string> | undefined): string {
+  if (aliases === undefined || aliases.size === 0) return markdown
+  const anchors = [...aliases]
+    .sort()
+    .map(fragment => `<a id="${escapeHtmlAttribute(fragment)}"></a>`)
+    .join('\n')
+  if (!markdown.startsWith('---\n')) return `${anchors}\n\n${markdown}`
+  const closingDelimiter = '\n---\n'
+  const closing = markdown.indexOf(closingDelimiter, 4)
+  if (closing === -1) throw new Error('project-doc-site: projected frontmatter has no closing delimiter.')
+  const bodyStart = closing + closingDelimiter.length
+  return `${markdown.slice(0, bodyStart)}${anchors}\n\n${markdown.slice(bodyStart)}`
 }
 
 /**
@@ -411,6 +513,7 @@ export function projectDocs(): void {
   /** Projected path to the repository file that claimed it, pages and images alike. */
   const claimed = new Map<string, string>()
   const repositoryRef = resolveRepositoryRef(process.env)
+  const fragmentAliases = fragmentAliasesFor(docsPages)
   rmSync(generatedRoot, { recursive: true, force: true })
 
   /** Reserve one projected path, refusing a second source for it. */
@@ -465,6 +568,7 @@ export function projectDocs(): void {
         return `./${encodeURI(name)}`
       },
     })
-    writeFileSync(output, addProjectionFrontmatter(projectedPageContent(projected, page), page))
+    const content = addFragmentAliases(projectedPageContent(projected, page), fragmentAliases.get(page.source))
+    writeFileSync(output, addProjectionFrontmatter(content, page))
   }
 }

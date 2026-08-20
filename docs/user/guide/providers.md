@@ -1,6 +1,6 @@
 # Configure models
 
-English | [中文](providers.zh.md)
+English | [中文](providers.zh.md) | [日本語](providers.ja.md)
 
 This guide assumes you started the Web UI through the [root README](../../../README.md#run). Model changes take effect on the next request without restarting the server.
 

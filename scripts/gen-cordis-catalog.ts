@@ -17,7 +17,7 @@
  * a missing regeneration.
  */
 
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import {
   projectCordisCatalog,
@@ -31,6 +31,7 @@ import { renderCordisCoreApiPages } from './cordis-core-api.ts'
 import { contextKeyMap, contextMergeFiles, eventNameList } from './cordis-walk.ts'
 import {
   blobHash,
+  isPublicTranslationSource,
   parsePairMeta,
   partitionGeneratedRegions,
   renderPairMeta,
@@ -837,7 +838,12 @@ export function computeOutputs(): [string, string][] {
       events.filter(e => EVENT_SCOPE_PAGE[e.scope] === page),
       CORDIS_CATALOG_POLICY,
     )
-    for (const side of [page, page.replace(/\.md$/, '.zh.md')]) {
+    const sides = [page, page.replace(/\.md$/, '.zh.md')]
+    const japanese = page.replace(/\.md$/, '.ja.md')
+    if (isPublicTranslationSource(`${SUBSYSTEMS_DIR}/${page}`) && existsSync(resolve(root, `${SUBSYSTEMS_DIR}/${japanese}`))) {
+      sides.push(japanese)
+    }
+    for (const side of sides) {
       const rel = `${SUBSYSTEMS_DIR}/${side}`
       let current: string
       try {
@@ -873,8 +879,11 @@ export function computeOutputs(): [string, string][] {
  */
 export function maybeRecordPair(pageRel: string, before: Map<string, Buffer>, scanRoot: string = root): boolean {
   const zhRel = pageRel.replace(/\.md$/, '.zh.md')
+  const jaRel = pageRel.replace(/\.md$/, '.ja.md')
   const metaRel = pageRel.replace(/\.md$/, '.i18n.yaml')
   const metaAbs = resolve(scanRoot, metaRel)
+  const publicPage = isPublicTranslationSource(pageRel)
+  const sides = publicPage ? [pageRel, zhRel, jaRel] : [pageRel, zhRel]
   let meta: string
   try {
     meta = readFileSync(metaAbs, 'utf8')
@@ -883,13 +892,13 @@ export function maybeRecordPair(pageRel: string, before: Map<string, Buffer>, sc
     // after review, never silently by regeneration.
     return false
   }
-  // The record must contain exactly the two valid entries for THIS pair;
+  // The record must contain exactly the valid entries for THIS pair;
   // a malformed or renamed-key sidecar is the pairing gate's problem to
   // report, never something regeneration silently repairs into validity.
   const recorded = parsePairMeta(meta)
-  const names = [pageRel, zhRel].map(rel => rel.split('/').at(-1) ?? rel)
-  if (!recorded || recorded.size !== 2 || !names.every(name => recorded.has(name))) return false
-  for (const rel of [pageRel, zhRel]) {
+  const names = sides.map(rel => rel.split('/').at(-1) ?? rel)
+  if (!recorded || recorded.size !== sides.length || !names.every(name => recorded.has(name))) return false
+  for (const rel of sides) {
     const previous = before.get(rel)
     if (!previous) return false
     if (recorded.get(rel.split('/').at(-1) ?? rel) !== blobHash(previous)) return false
@@ -900,7 +909,15 @@ export function maybeRecordPair(pageRel: string, before: Map<string, Buffer>, sc
   }
   const source = readFileSync(resolve(scanRoot, pageRel))
   const zh = readFileSync(resolve(scanRoot, zhRel))
-  writeFileSync(metaAbs, renderPairMeta(pageRel, blobHash(source), zhRel, blobHash(zh)))
+  const ja = publicPage ? readFileSync(resolve(scanRoot, jaRel)) : undefined
+  writeFileSync(metaAbs, renderPairMeta(
+    pageRel,
+    blobHash(source),
+    zhRel,
+    blobHash(zh),
+    publicPage ? jaRel : undefined,
+    publicPage && ja !== undefined ? blobHash(ja) : undefined,
+  ))
   return true
 }
 

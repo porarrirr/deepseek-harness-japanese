@@ -40,6 +40,7 @@ describe('LocaleRuntime', () => {
     const { svc } = make()
     svc.register('ns', 'zh', { hello: '你好' })
     svc.register('ns', 'en', { hello: 'Hello', onlyEn: 'English only' })
+    svc.register('ns', 'ja', { hello: 'こんにちは' })
     const t = svc.bind('ns')
     expect(svc.getLocale().active).toBe('zh')
     expect(t('hello')).toBe('你好')
@@ -47,15 +48,18 @@ describe('LocaleRuntime', () => {
     expect(t('onlyEn')).toBe('English only')
     svc.setLocale('en')
     expect(t('hello')).toBe('Hello')
+    svc.setLocale('ja')
+    expect(t('hello')).toBe('こんにちは')
     expect(t('missing.key')).toBe('missing.key')
   })
 
   it('falls through to the common vocabulary after the namespace misses (production keys)', () => {
     const { svc } = make()
-    // The shipped common pair is registered by apply; the bench registers it
+    // The shipped common dictionaries are registered by apply; the bench registers them
     // directly to pin the production chain: ns -> common -> en -> key.
     svc.register('common', 'zh', { retry: '重试' })
     svc.register('common', 'en', { retry: 'Retry' })
+    svc.register('common', 'ja', { retry: '再試行' })
     svc.register('ns', 'en', { own: 'Own' })
     const t = svc.bind('ns')
     expect(t('retry')).toBe('重试')
@@ -63,6 +67,9 @@ describe('LocaleRuntime', () => {
     expect(t('own')).toBe('Own')
     svc.setLocale('en')
     expect(t('retry')).toBe('Retry')
+    expect(t('own')).toBe('Own')
+    svc.setLocale('ja')
+    expect(t('retry')).toBe('再試行')
     expect(t('own')).toBe('Own')
     // common itself must not recurse: a miss inside common echoes the key.
     // (Wide-string ns hits the untyped bind overload — the typed one rejects
@@ -217,6 +224,10 @@ describe('LocaleRuntime', () => {
     expect(make().svc.getLocale().active).toBe('en')
     stubLanguages('zh-Hant-TW')
     expect(make().svc.getLocale().active).toBe('zh')
+    stubLanguages('ja-JP')
+    expect(make().svc.getLocale().active).toBe('ja')
+    stubLanguages('fr-FR', 'ja-JP')
+    expect(make().svc.getLocale().active).toBe('ja')
     // An unshipped language walks the list to the first one this app ships.
     stubLanguages('fr-FR', 'en-US')
     expect(make().svc.getLocale().active).toBe('en')
@@ -253,8 +264,8 @@ describe('LocaleRuntime', () => {
   it('serves English as both the opening locale and the dictionary fallback', () => {
     // One constant covers both jobs: the locale the UI opens in with no usable
     // browser signal, and the dictionary backing a key the active locale
-    // misses. Safe to share only because the shipped zh/en dictionaries carry
-    // identical key sets (asserted below on a registered pair).
+    // misses. Safe to share only because the shipped zh/en/ja dictionaries carry
+    // identical key sets (asserted by the parity gate).
     expect(FALLBACK_LOCALE).toBe('en')
     vi.stubGlobal('window', undefined)
     const { svc } = make()
@@ -272,11 +283,12 @@ describe('LocaleRuntime', () => {
     expect(svc.bind('ns2')('onlyZh')).toBe('onlyZh')
   })
 
-  it('exposes the two shipped locales with self-described labels', () => {
+  it('exposes the three shipped locales with self-described labels', () => {
     const { svc } = make()
     expect(svc.getLocale().locales).toEqual([
       { id: 'zh', label: '中文' },
       { id: 'en', label: 'English' },
+      { id: 'ja', label: '日本語' },
     ])
   })
 })

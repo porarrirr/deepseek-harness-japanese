@@ -1,6 +1,6 @@
 # Cookbook: 新增设置卡片
 
-[English](adding-a-settings-card.md) | 中文
+[English](adding-a-settings-card.md) | 中文 | [日本語](adding-a-settings-card.ja.md)
 
 插件如何把自己的配置放上 Web 设置页。这条路径上没有任何一步需要改动本仓库：Host 服务每一个已注册的 settings 命名空间，而**插件配置**分区以卡片所编辑的命名空间为键，因此同时注册了两个半侧的插件会被自动配对。
 

@@ -119,6 +119,20 @@ function record(root: string, path: string, source: string, zh: string): string 
   return content
 }
 
+function recordTrilingual(root: string, path: string, source: string, zh: string, ja: string): string {
+  const paths = translationPairPaths(path)
+  write(root, paths.source, source)
+  write(root, paths.zh, zh)
+  write(root, paths.ja, ja)
+  const content = renderTranslationPairingRecord(paths, {
+    sourceHash: storeGitBlob(root, Buffer.from(source)),
+    zhHash: storeGitBlob(root, Buffer.from(zh)),
+    jaHash: storeGitBlob(root, Buffer.from(ja)),
+  }, 'trilingual')
+  write(root, paths.meta, content)
+  return content
+}
+
 const baseSource = '# Guide\n\nEnglish | [中文](guide.zh.md)\n\nAlpha base.\n\nBeta base.\n'
 const baseZh = '# 指南\n\n[English](guide.md) | 中文\n\n甲基础。\n\n乙基础。\n'
 const currentSource = baseSource.replace('Alpha base.', 'Alpha current.')
@@ -139,6 +153,16 @@ const manualCurrentSource = manualBaseSource.replace('Alpha base.', 'Alpha curre
 const manualCurrentZh = manualBaseZh.replace('甲基础。', '甲当前。')
 const manualOtherSource = manualBaseSource.replace('Alpha base.', 'Alpha other.')
 const manualOtherZh = manualBaseZh.replace('甲基础。', '甲对侧。')
+const publicPath = 'docs/user/guide/providers.md'
+const publicBaseSource = '# Providers\n\nEnglish | [中文](providers.zh.md) | [日本語](providers.ja.md)\n\nAlpha base.\n\nBeta base.\n'
+const publicBaseZh = '# 提供商\n\n[English](providers.md) | 中文 | [日本語](providers.ja.md)\n\n甲基础。\n\n乙基础。\n'
+const publicBaseJa = '# プロバイダー\n\n[English](providers.md) | [中文](providers.zh.md) | 日本語\n\nアルファ基準。\n\nベータ基準。\n'
+const publicCurrentSource = publicBaseSource.replace('Alpha base.', 'Alpha current.')
+const publicCurrentZh = publicBaseZh.replace('甲基础。', '甲当前。')
+const publicCurrentJa = publicBaseJa.replace('アルファ基準。', 'アルファ現在。')
+const publicOtherSource = publicBaseSource.replace('Beta base.', 'Beta other.')
+const publicOtherZh = publicBaseZh.replace('乙基础。', '乙对侧。')
+const publicOtherJa = publicBaseJa.replace('ベータ基準。', 'ベータ対側。')
 
 function commitPair(fixture: Fixture, source: string, zh: string, message: string): string {
   const sidecar = record(fixture.root, 'docs/guide.md', source, zh)
@@ -269,6 +293,26 @@ describe('translation pairing merge composition', { timeout: 15_000 }, () => {
     expect(result.zhContent.toString('utf8')).toBe(mergedZh)
     expect(result.sourceHash).toBe(gitBlobHash(Buffer.from(mergedSource)))
     expect(result.zhHash).toBe(gitBlobHash(Buffer.from(mergedZh)))
+  })
+
+  it('merges all three owner blobs for a published page', () => {
+    const fixture = createFixture(false)
+    const ancestor = recordTrilingual(fixture.root, publicPath, publicBaseSource, publicBaseZh, publicBaseJa)
+    const current = recordTrilingual(fixture.root, publicPath, publicCurrentSource, publicCurrentZh, publicCurrentJa)
+    const other = recordTrilingual(fixture.root, publicPath, publicOtherSource, publicOtherZh, publicOtherJa)
+
+    const result = mergeTranslationPairingRecords(
+      fixture.root,
+      'docs/user/guide/providers.i18n.yaml',
+      ancestor,
+      current,
+      other,
+    )
+
+    const mergedJa = publicCurrentJa.replace('ベータ基準。', 'ベータ対側。')
+    expect(result.jaContent?.toString('utf8')).toBe(mergedJa)
+    expect(result.jaHash).toBe(gitBlobHash(Buffer.from(mergedJa)))
+    expect(result.record).toContain('providers.ja.md: ')
   })
 
   it('merges a generated source without an English language switcher', () => {

@@ -16,6 +16,10 @@ import { blobHash, renderPairMeta } from './translation-pairing.ts'
 const PAGE = 'docs/subsystems/fix.md'
 const ZH = 'docs/subsystems/fix.zh.md'
 const META = 'docs/subsystems/fix.i18n.yaml'
+const PUBLIC_PAGE = 'docs/user/guide/providers.md'
+const PUBLIC_ZH = 'docs/user/guide/providers.zh.md'
+const PUBLIC_JA = 'docs/user/guide/providers.ja.md'
+const PUBLIC_META = 'docs/user/guide/providers.i18n.yaml'
 
 function page(prose: string, region: string): string {
   return `# Fix\n\n${prose}\n\n${REGION_BEGIN}\n${region}\n${REGION_END}\n`
@@ -49,6 +53,41 @@ function setup(options: {
   return { root, before }
 }
 
+/** Lay out a public three-language pair for the region re-record guard. */
+function setupPublic(options: {
+  beforeEn: string
+  beforeZh: string
+  beforeJa: string
+  currentEn: string
+  currentZh: string
+  currentJa: string
+  meta?: string | null
+}): { root: string; before: Map<string, Buffer> } {
+  const root = mkdtempSync(join(tmpdir(), 'record-guard-public-'))
+  roots.push(root)
+  mkdirSync(join(root, 'docs/user/guide'), { recursive: true })
+  writeFileSync(join(root, PUBLIC_PAGE), options.currentEn)
+  writeFileSync(join(root, PUBLIC_ZH), options.currentZh)
+  writeFileSync(join(root, PUBLIC_JA), options.currentJa)
+  const meta = options.meta === undefined
+    ? renderPairMeta(
+      PUBLIC_PAGE,
+      blobHash(Buffer.from(options.beforeEn)),
+      PUBLIC_ZH,
+      blobHash(Buffer.from(options.beforeZh)),
+      PUBLIC_JA,
+      blobHash(Buffer.from(options.beforeJa)),
+    )
+    : options.meta
+  if (meta !== null) writeFileSync(join(root, PUBLIC_META), meta)
+  const before = new Map<string, Buffer>([
+    [PUBLIC_PAGE, Buffer.from(options.beforeEn)],
+    [PUBLIC_ZH, Buffer.from(options.beforeZh)],
+    [PUBLIC_JA, Buffer.from(options.beforeJa)],
+  ])
+  return { root, before }
+}
+
 describe('maybeRecordPair', () => {
   const beforeEn = page('prose.', 'old region')
   const beforeZh = page('散文。', 'old region')
@@ -60,6 +99,29 @@ describe('maybeRecordPair', () => {
     expect(maybeRecordPair(PAGE, before, root)).toBe(true)
     expect(readFileSync(join(root, META), 'utf8'))
       .toBe(renderPairMeta(PAGE, blobHash(Buffer.from(currentEn)), ZH, blobHash(Buffer.from(currentZh))))
+  })
+
+  it('re-records all three owner hashes for a public region write', () => {
+    const beforeJa = page('プローズ。', 'old region')
+    const currentJa = page('プローズ。', 'new region')
+    const { root, before } = setupPublic({
+      beforeEn,
+      beforeZh,
+      beforeJa,
+      currentEn,
+      currentZh,
+      currentJa,
+    })
+    expect(maybeRecordPair(PUBLIC_PAGE, before, root)).toBe(true)
+    expect(readFileSync(join(root, PUBLIC_META), 'utf8'))
+      .toBe(renderPairMeta(
+        PUBLIC_PAGE,
+        blobHash(Buffer.from(currentEn)),
+        PUBLIC_ZH,
+        blobHash(Buffer.from(currentZh)),
+        PUBLIC_JA,
+        blobHash(Buffer.from(currentJa)),
+      ))
   })
 
   it('refuses when the pair was already out of sync before the run', () => {

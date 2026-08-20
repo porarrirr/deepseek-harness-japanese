@@ -46,3 +46,25 @@ export const en = {
   failed: 'Mount failed',
   unloading: 'Unloading',
 } satisfies Record<PluginInventoryLocaleKey, string>
+
+/** Japanese dictionary checked against the Chinese key set. */
+export const ja = {
+  tab: 'プラグイン一覧',
+  loading: 'プラグインを読み込み中…',
+  error: 'プラグインを読み込めません。',
+  retry: '再試行',
+  search: 'プラグインを検索',
+  catalog: 'プラグイン一覧',
+  empty: '利用できるプラグインはありません。',
+  emptySearch: '一致するプラグインはありません。',
+  enabledTag: '有効',
+  disabledTag: '無効',
+  configuration: '設定状態',
+  cordis: 'Cordis の状態',
+  unobserved: '未マウント',
+  pending: '依存関係を待機中',
+  loadingPhase: '読み込み中',
+  active: 'マウント済み',
+  failed: 'マウントに失敗',
+  unloading: 'アンマウント中',
+} satisfies Record<PluginInventoryLocaleKey, string>
